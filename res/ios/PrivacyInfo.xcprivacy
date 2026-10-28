@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Privacy-Manifest für Drawmory (Muster: FairMix).
+
+  Apple verlangt diese Datei. Fehlt sie oder ist sie leer, weist App Store
+  Connect den Upload zurück – erst nach der Verarbeitung, die Build-Nummer
+  ist dann verbraucht.
+
+  Der Inhalt bildet das Verhalten der App ab: Drawmory erhebt nichts, sendet
+  nichts und trackt nicht. Der In-App-Kauf läuft über StoreKit; Zahlungsdaten
+  sieht nur Apple. Das deckt sich mit der Datenschutzerklärung.
+
+  Einziger meldepflichtiger Zugriff: UserDefaults. Cordova legt dort eigene
+  Einstellungen ab. Grund CA92.1 = nur Daten des eigenen App-Containers.
+
+  Plugins bringen gegebenenfalls eigene Manifeste mit. Kommt eines dazu, das
+  eine weitere Required-Reason-API nutzt, gehört der Grund hierher oder in
+  dessen Manifest.
+-->
+<plist version="1.0">
+<dict>
+    <key>NSPrivacyTracking</key>
+    <false/>
+
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!-- Leer und bewusst so: Die App sammelt keine Daten. -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array/>
+
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
