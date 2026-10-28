@@ -1,5 +1,12 @@
 # Repo simaehlmann-cloud.github.io
 
+> Im Repo **Drawmory** liegt unter `universal-links/` nur die **Vorlage**
+> (`apple-app-site-association` ohne Punkt-Ordner, mit Platzhalter
+> `DEINE_TEAM_ID`), damit `validate.js` sie mit der App abgleichen kann.
+> Wirksam ist allein die Fassung im Repo `simaehlmann-cloud.github.io` unter
+> `.well-known/apple-app-site-association` mit echter Team-ID. Ändern sich
+> die Pfade, beide Dateien anpassen.
+
 Dieses Repo gibt es nur, damit iOS geteilte Drawmory-Links direkt in der App
 öffnet (Universal Links). Apple sucht die Freigabe immer im Wurzelverzeichnis
 der Domain – bei GitHub Pages ist das dieses besondere Repo, nicht das Repo

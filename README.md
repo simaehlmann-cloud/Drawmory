@@ -91,8 +91,8 @@ Bausteine der Universal Links:
   meldet Universal Links nicht an JavaScript und startet Plugins erst nach dem
   Szenenaufbau; das Plugin reicht Warm- und Kaltstart-Links an `handleOpenURL`
   weiter und trägt `applinks:simaehlmann-cloud.github.io` für Release-Builds ein.
-- `universal-links/` – Inhalt des Repos `simaehlmann-cloud.github.io` mit der
-  Freigabe `.well-known/apple-app-site-association`. Gilt nur für
+- `universal-links/` – Vorlage für das Repo `simaehlmann-cloud.github.io`; dort liegt
+  die Freigabe unter `.well-known/apple-app-site-association` mit echter Team-ID. Gilt nur für
   `/Drawmory/open/*` und `/Drawmory/#t=*` – Datenschutz und Impressum öffnen
   weiter im Browser.
 - `validate.js` gleicht Domain, Plugin, Freigabe und Landeseite ab und prüft an
@@ -116,7 +116,7 @@ res/android/                adaptive Android-Icons je Dichte und colors.xml
 make-icons.py               erzeugt alle Icons neu (läuft auch in den Workflows)
 open/index.html             Landeseite für QR-Codes und geteilte Links
 cordova-plugins/drawmory-links/  Plugin: Universal Links an die App weiterreichen
-universal-links/            Inhalt für das Repo simaehlmann-cloud.github.io (Apple-Freigabe)
+universal-links/            Vorlage der Apple-Freigabe (wirksam im Repo simaehlmann-cloud.github.io)
 validate.js                 statische Prüfung, gleicht auch die Workflows mit der App ab
 smoketest.js                Ablauftest im echten Browser
 package.json                Prüfwerkzeuge (Playwright, jsQR, pngjs) – nur für Tests

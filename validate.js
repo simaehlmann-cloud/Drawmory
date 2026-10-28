@@ -208,7 +208,9 @@ else {
   }
   if (!/spec="\.\.\/cordova-plugins\/drawmory-links"/.test(cfg)) E("config.xml bindet das Plugin drawmory-links nicht ein");
   /* Apple-Freigabe: Pfade decken neue und alte Links ab */
-  const aasaFile = "universal-links/.well-known/apple-app-site-association";
+  /* Vorlage ohne Punkt-Ordner – lässt sich so über die GitHub-Webseite hochladen.
+     Im Repo simaehlmann-cloud.github.io liegt sie unter .well-known/. */
+  const aasaFile = "universal-links/apple-app-site-association";
   if (!fs.existsSync(aasaFile)) E("Vorlage der Apple-Freigabe fehlt: " + aasaFile);
   else {
     let aasa = null;
@@ -226,7 +228,6 @@ else {
         E("Apple-Freigabe ist zu weit – Datenschutz oder Webfassung würden in die App umgeleitet");
     }
   }
-  if (!fs.existsSync("universal-links/.nojekyll")) E("universal-links/.nojekyll fehlt – GitHub Pages würde .well-known nicht ausliefern");
   /* Landeseite: vorhanden, gleicher Decoder wie die App */
   if (!fs.existsSync("open/index.html")) E("Landeseite open/index.html fehlt");
   else {
@@ -260,7 +261,7 @@ else {
       else O(`Landeseite und App lesen 300 Codes gleich (gültige und beschädigte)`);
     } catch (e) { E("Decoder-Vergleich nicht ausführbar: " + e.message); }
   }
-  if (!errors.some(e => /SHARE_BASE|LINK_HOST|Plugin|plugin|Apple-Freigabe|apple-app|Landeseite|APP_STORE_ID|nojekyll/.test(e)))
+  if (!errors.some(e => /SHARE_BASE|LINK_HOST|Plugin|plugin|Apple-Freigabe|apple-app|Landeseite|APP_STORE_ID/.test(e)))
     O(`Geteilte Links: ${base} → App (${host}), sonst Landeseite`);
 }
 

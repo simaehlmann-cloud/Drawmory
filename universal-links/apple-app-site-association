@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["DEINE_TEAM_ID.de.drawmory.app"],
+        "components": [
+          {
+            "/": "/Drawmory/open/*",
+            "comment": "QR-Codes und geteilte Links ab Drawmory 0.3"
+          },
+          {
+            "/": "/Drawmory/",
+            "#": "t=*",
+            "comment": "Links aus Drawmory 0.2 (Vorlage im Teil hinter #)"
+          }
+        ]
+      }
+    ]
+  }
+}
