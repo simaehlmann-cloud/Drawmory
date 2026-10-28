@@ -1,0 +1,257 @@
+name: Build Drawmory (Android)
+
+# Vorbereitet für den späteren Play-Store-Start. Läuft bei jedem Push und
+# liefert immer ein Debug-APK. Sobald die vier Keystore-Secrets hinterlegt
+# sind, kommen ein signiertes APK (zum Testen) und ein AAB (für die Play
+# Console) dazu. Ohne Secrets bleibt es beim Debug-APK – der Lauf ist trotzdem grün.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ID: de.drawmory.app
+      APP_NAME: Drawmory
+      # Festgepinnt wie bei FairMix: derselbe Commit liefert in einem Jahr
+      # dasselbe Ergebnis. Zum Anheben nur diese Zeilen ändern.
+      CORDOVA_CLI: '13.0.0'
+      CORDOVA_ANDROID: '15.0.0'
+      # Muss zu android-targetSdkVersion in der config.xml passen.
+      TARGET_SDK: '36'
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+
+      - name: Node einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Bewusst ganz vorne: Ein fehlerhafter Commit fällt auf, bevor das
+      # Android-SDK geladen ist.
+      - name: Prüfwerkzeuge installieren
+        run: |
+          set -e
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Prüfungen
+        run: |
+          set -e
+          node validate.js
+          python3 -m http.server 8765 > /dev/null 2>&1 &
+          sleep 2
+          node smoketest.js
+
+      - name: Icons erzeugen
+        run: |
+          set -e
+          python3 -m pip install --quiet --break-system-packages Pillow || pip install --quiet Pillow
+          python3 make-icons.py
+
+      - name: Java einrichten
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # packages ausdrücklich setzen: Das veraltete Paket "tools" liefert
+      # Google seit dem 15.09.2026 nicht mehr aus (Erfahrung aus FairMix).
+      - name: Android SDK bereitstellen
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'
+
+      - name: SDK-Pakete für API ${{ env.TARGET_SDK }} nachziehen
+        run: |
+          set -e
+          sdkmanager --install \
+            "platforms;android-${TARGET_SDK}" \
+            "build-tools;${TARGET_SDK}.0.0" \
+            "platform-tools"
+
+      - name: Cordova installieren
+        run: npm install -g "cordova@${CORDOVA_CLI}"
+
+      - name: Cordova-Projekt aufbauen
+        run: |
+          set -e
+          cordova create build "$APP_ID" "$APP_NAME"
+          cp config.xml build/config.xml
+          mkdir -p build/res/android
+          cp res/android/* build/res/android/
+
+          rm -rf build/www/*
+          cp index.html manifest.json sw.js datenschutz.html impressum.html \
+             datenschutz-en.html impressum-en.html build/www/
+          cp icon.png icon-180.png icon-192.png icon-maskable-512.png build/www/
+
+          # Kontrolle: Kennung und Name sind nach dem ersten Play-Upload unveränderlich.
+          grep -o 'id="[^"]*"' build/config.xml | head -1
+          grep -o '<name>[^<]*</name>' build/config.xml | head -1
+
+          cd build
+          cordova platform add "android@${CORDOVA_ANDROID}"
+          cordova plugin ls
+          cordova clean android
+
+      - name: Erzeugtes Projekt bestätigen
+        working-directory: build
+        run: |
+          set -e
+          FEHLER=0
+          if grep -rqE "(\"SDK_VERSION\"[[:space:]]*:[[:space:]]*${TARGET_SDK}|targetSdkVersion[[:space:]]*=?[[:space:]]*\"?${TARGET_SDK})" \
+               platforms/android/cdv-gradle-config.json \
+               platforms/android/app/build.gradle 2>/dev/null; then
+            echo "Ziel-SDK ${TARGET_SDK} bestätigt."
+          else
+            echo "::error::Ziel-SDK ist nicht ${TARGET_SDK}. Play würde den Upload ablehnen."; FEHLER=1
+          fi
+          # In-App-Kauf über Google Play Billing
+          if cordova plugin ls | grep -q '^cordova-plugin-purchase'; then
+            echo "In-App-Kauf: cordova-plugin-purchase installiert"
+          else
+            echo "::error::cordova-plugin-purchase ist nicht installiert."; FEHLER=1
+          fi
+          # Die Billing-Berechtigung bringt die Google-Bibliothek je nach
+          # Fassung erst beim Zusammenführen der Manifeste im Build mit.
+          # Hier nur ein Hinweis; geprüft wird sie unten im fertigen APK.
+          grep -q 'com.android.vending.BILLING' platforms/android/app/src/main/AndroidManifest.xml \
+            && echo "Berechtigung BILLING bereits im Manifest" \
+            || echo "Berechtigung BILLING folgt beim Build (Manifest-Zusammenführung)."
+          # drawmory://-Links
+          grep -q 'android:scheme="drawmory"' platforms/android/app/src/main/AndroidManifest.xml \
+            && echo "URL-Schema drawmory:// vorhanden" \
+            || { echo "::error::URL-Schema drawmory fehlt im Manifest."; FEHLER=1; }
+          exit $FEHLER
+
+      - name: Debug-APK bauen
+        working-directory: build
+        run: cordova build android --debug -- --packageType=apk
+
+      # Im fertigen APK muss die Billing-Berechtigung stehen, sonst bleibt der
+      # Kaufknopf unter Android wirkungslos.
+      - name: Billing-Berechtigung im APK bestätigen
+        working-directory: build
+        run: |
+          set -e
+          AAPT2="$ANDROID_HOME/build-tools/${TARGET_SDK}.0.0/aapt2"
+          APK=$(ls platforms/android/app/build/outputs/apk/debug/*.apk | head -1)
+          if "$AAPT2" dump permissions "$APK" | grep -q 'com.android.vending.BILLING'; then
+            echo "BILLING im APK bestätigt."
+          else
+            echo "::error::Das APK fordert com.android.vending.BILLING nicht an – In-App-Kauf wäre wirkungslos."
+            exit 1
+          fi
+
+      - name: Debug-APK hochladen
+        uses: actions/upload-artifact@v6
+        with:
+          name: Drawmory-debug-apk
+          path: build/platforms/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+      # ---- Signierter Release-Build für den Play Store ----
+      # Vier Repository-Secrets, mit einem EIGENEN Keystore für Drawmory
+      # (nicht dem von FairMix – Play verknüpft Schlüssel und Kennung dauerhaft):
+      #   ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD,
+      #   ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD
+      - name: Keystore entschlüsseln
+        id: keystore
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "vorhanden=false" >> "$GITHUB_OUTPUT"
+            echo "Kein Keystore hinterlegt – Release-Build wird übersprungen."
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_B64" | sed '1s/^\xEF\xBB\xBF//' | tr -d ' \t\r\n' \
+            | base64 -d > "$RUNNER_TEMP/drawmory.keystore"
+          if [ ! -s "$RUNNER_TEMP/drawmory.keystore" ]; then
+            echo "::error::Der Keystore ließ sich nicht dekodieren. ANDROID_KEYSTORE_BASE64 erneut einfügen."
+            exit 1
+          fi
+          echo "vorhanden=true" >> "$GITHUB_OUTPUT"
+
+      - name: Signiert bauen (APK zum Testen und AAB für den Store)
+        if: steps.keystore.outputs.vorhanden == 'true'
+        working-directory: build
+        env:
+          STORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PW: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e
+          for name in STORE_PW KEY_ALIAS KEY_PW; do
+            eval "wert=\$$name"
+            [ -n "$wert" ] || { echo "::error::Secret für $name fehlt oder ist leer."; exit 1; }
+          done
+          cat > build.json <<JSON
+          {
+            "android": {
+              "release": {
+                "keystore": "$RUNNER_TEMP/drawmory.keystore",
+                "storePassword": "$STORE_PW",
+                "alias": "$KEY_ALIAS",
+                "password": "$KEY_PW",
+                "keystoreType": "pkcs12"
+              }
+            }
+          }
+          JSON
+          cordova build android --release -- --packageType=apk
+          cordova build android --release -- --packageType=bundle
+          rm -f build.json
+
+      # Kontrolle von Kennung und Schlüssel, bevor der erste Upload beides
+      # in der Play Console dauerhaft festlegt.
+      - name: Signatur und Kennung bestätigen
+        if: steps.keystore.outputs.vorhanden == 'true'
+        working-directory: build
+        env:
+          STORE_PW: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -e
+          APKSIGNER="$ANDROID_HOME/build-tools/${TARGET_SDK}.0.0/apksigner"
+          AAPT2="$ANDROID_HOME/build-tools/${TARGET_SDK}.0.0/aapt2"
+          APK=$(ls platforms/android/app/build/outputs/apk/release/*.apk | head -1)
+          KENNUNG=$("$AAPT2" dump packagename "$APK")
+          echo "Kennung: $KENNUNG"
+          [ "$KENNUNG" = "$APP_ID" ] || { echo "::error::Kennung ist $KENNUNG, erwartet $APP_ID."; exit 1; }
+          AUS_APK=$("$APKSIGNER" verify --print-certs "$APK" \
+            | grep -i -m1 "certificate SHA-256 digest" | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
+          AUS_KEYSTORE=$(keytool -list -v -keystore "$RUNNER_TEMP/drawmory.keystore" \
+            -alias "$KEY_ALIAS" -storepass "$STORE_PW" \
+            | grep -i -m1 "SHA256:" | awk '{print $NF}' | tr -d ':' | tr 'A-F' 'a-f')
+          echo "APK:      $AUS_APK"
+          echo "Keystore: $AUS_KEYSTORE"
+          [ -n "$AUS_APK" ] && [ "$AUS_APK" = "$AUS_KEYSTORE" ] \
+            || { echo "::error::Das APK wurde nicht mit dem erwarteten Schlüssel signiert."; exit 1; }
+
+      - name: Signiertes APK hochladen
+        if: steps.keystore.outputs.vorhanden == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Drawmory-release-apk
+          path: build/platforms/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+
+      - name: AAB hochladen
+        if: steps.keystore.outputs.vorhanden == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Drawmory-release-aab
+          path: build/platforms/android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+
+      - name: Keystore entfernen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/drawmory.keystore"

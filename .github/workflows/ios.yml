@@ -1,0 +1,361 @@
+name: Build Drawmory (iOS)
+
+# Aufbau wie bei FairMix: Prüfkette auf Linux, Build auf macOS, Upload nach
+# App Store Connect (TestFlight) nur bei manuellem Start.
+#
+# Es gibt genau eine App mit In-App-Kauf "Vollversion" – keine Lite-Fassung,
+# die wäre nach Apples Richtlinie 4.3 (doppelte Apps) angreifbar.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # macOS-Läufer werden je Minute zehnfach abgerechnet – ein Fehler soll auf
+  # dem günstigen Linux-Läufer auffallen, bevor der teure überhaupt startet.
+  pruefungen:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+
+      - name: Node einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Der Ablauftest spielt die App in einem echten Chromium durch und liest
+      # QR-Codes mit einem unabhängigen Decoder zurück. Die Werkzeuge dafür
+      # stehen in package.json, die App selbst braucht keine Pakete.
+      - name: Prüfwerkzeuge installieren
+        run: |
+          set -e
+          npm install --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Prüfungen
+        run: |
+          set -e
+          node validate.js
+          python3 -m http.server 8765 > /dev/null 2>&1 &
+          sleep 2
+          node smoketest.js
+
+  build:
+    needs: pruefungen
+    # Festgepinnt, nicht macos-latest: "latest" wandert ohne Vorwarnung auf
+    # eine neue Xcode-Fassung.
+    runs-on: macos-26
+
+    env:
+      APP_ID: de.drawmory.app
+      APP_NAME: Drawmory
+      URL_SCHEME: drawmory
+      CORDOVA_CLI: '13.0.0'
+      CORDOVA_IOS: '8.1.1'
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v5
+
+      - name: Node einrichten
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # Apple nimmt Uploads nur mit hinreichend neuem SDK an. Diese Zeile ist
+      # der Ort, an dem das jährlich nachgezogen wird.
+      - name: Xcode auswählen
+        run: |
+          set -e
+          ls /Applications | grep -i '^Xcode' || true
+          APP=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$APP" ] || { echo "Kein Xcode 26 auf diesem Läufer gefunden."; exit 1; }
+          sudo xcode-select -switch "$APP"
+          xcodebuild -version
+
+      # Icons werden hier neu erzeugt statt aus dem Repo übernommen: so ist
+      # sicher, dass sie keinen Alphakanal tragen (App Store Connect lehnt
+      # Transparenz ab) und zur aktuellen make-icons.py passen.
+      - name: Icons und Startbild erzeugen
+        run: |
+          set -e
+          python3 -m pip install --quiet --break-system-packages Pillow || pip3 install --quiet Pillow
+          python3 make-icons.py
+          python3 - <<'PY'
+          from PIL import Image
+          im = Image.open("res/ios/icon-1024.png")
+          assert im.size == (1024, 1024), im.size
+          assert im.mode == "RGB", "icon-1024.png hat einen Alphakanal: " + im.mode
+          print("App-Store-Icon: 1024×1024, ohne Alphakanal")
+          PY
+
+      - name: Cordova installieren
+        run: npm install -g "cordova@${CORDOVA_CLI}"
+
+      - name: Cordova-Projekt aufbauen
+        run: |
+          set -e
+          cordova create build "$APP_ID" "$APP_NAME"
+          cp config.xml build/config.xml
+          mkdir -p build/res/ios build/res/android
+          cp res/ios/* build/res/ios/
+          cp res/android/* build/res/android/
+
+          # Nur die tatsächlichen App-Dateien in www kopieren
+          rm -rf build/www/*
+          cp index.html manifest.json sw.js datenschutz.html impressum.html datenschutz-en.html impressum-en.html build/www/
+          cp icon.png icon-180.png icon-192.png icon-maskable-512.png build/www/
+
+          # Kontrolle: was hier steht, landet im Store.
+          grep -o 'id="[^"]*"' build/config.xml | head -1
+          grep -o '<name>[^<]*</name>' build/config.xml | head -1
+
+          cd build
+          # Installiert auch die Plugins aus der config.xml (Teilen, Statusleiste,
+          # In-App-Kauf, drawmory://-Links).
+          cordova platform add "ios@${CORDOVA_IOS}"
+          cordova plugin ls
+
+      # Die config.xml erklärt nur die Absicht. Was Xcode baut, steht in der
+      # erzeugten Info.plist und Projektdatei – und genau daran scheitert ein
+      # Upload oder ein Test, wenn etwas fehlt. Jeder Punkt hier wäre sonst
+      # erst in App Store Connect oder in TestFlight aufgefallen.
+      - name: Erzeugtes Projekt bestätigen
+        working-directory: build
+        run: |
+          set -e
+          PLIST=$(find platforms/ios -maxdepth 3 -name '*-Info.plist' | head -1)
+          [ -n "$PLIST" ] || { echo "::error::Keine Info.plist im erzeugten Projekt gefunden."; exit 1; }
+          PBX=$(find platforms/ios -name project.pbxproj | head -1)
+          echo "--- Info.plist: $PLIST ---"
+
+          holen() {
+            /usr/libexec/PlistBuddy -c "Print :$1" "$PLIST" 2>/dev/null || echo "FEHLT"
+          }
+          # cordova-ios 8 schreibt für Kennung und Versionen nur Xcode-Variablen
+          # in die Plist; die Werte stehen in project.pbxproj.
+          aufloesen() {
+            local wert="$1" schluessel="$2"
+            case "$wert" in
+              FEHLT|*'$('*)
+                if [ -n "$PBX" ]; then
+                  wert=$(grep -m1 -o "$schluessel = [^;]*;" "$PBX" | sed 's/.*= *//; s/;$//; s/^"//; s/"$//')
+                fi
+                [ -n "$wert" ] || wert=FEHLT
+                ;;
+            esac
+            echo "$wert"
+          }
+
+          BUNDLE=$(aufloesen "$(holen CFBundleIdentifier)" PRODUCT_BUNDLE_IDENTIFIER)
+          VERSION=$(aufloesen "$(holen CFBundleShortVersionString)" MARKETING_VERSION)
+          BUILDNR=$(aufloesen "$(holen CFBundleVersion)" CURRENT_PROJECT_VERSION)
+          KRYPTO=$(holen ITSAppUsesNonExemptEncryption)
+          FOTOS=$(holen NSPhotoLibraryAddUsageDescription)
+
+          SOLL_VERSION=$(grep -o ' version="[^"]*"' config.xml | head -1 | cut -d'"' -f2)
+          SOLL_BUILD=$(grep -o 'ios-CFBundleVersion="[^"]*"' config.xml | cut -d'"' -f2)
+
+          echo "Bundle-ID:        $BUNDLE"
+          echo "Version / Build:  $VERSION / $BUILDNR  (config.xml: $SOLL_VERSION / $SOLL_BUILD)"
+          echo "Export-Erklärung: $KRYPTO"
+          echo "Foto-Hinweis:     $FOTOS"
+
+          FEHLER=0
+          [ "$BUNDLE" = "$APP_ID" ] || { echo "::error::Bundle-ID ist '$BUNDLE', erwartet '$APP_ID'."; FEHLER=1; }
+          [ "$VERSION" = "$SOLL_VERSION" ] || { echo "::error::Version ist '$VERSION', config.xml sagt '$SOLL_VERSION'."; FEHLER=1; }
+          [ "$BUILDNR" = "$SOLL_BUILD" ] || { echo "::error::Build-Nummer ist '$BUILDNR', config.xml sagt '$SOLL_BUILD'."; FEHLER=1; }
+          [ "$KRYPTO" = "false" ] || { echo "::error::ITSAppUsesNonExemptEncryption fehlt – jeder Upload fragt sonst nach."; FEHLER=1; }
+          [ "$FOTOS" != "FEHLT" ] || { echo "::error::NSPhotoLibraryAddUsageDescription fehlt – 'Bild sichern' beendet die App."; FEHLER=1; }
+
+          # drawmory:// muss als URL-Schema eingetragen sein, sonst öffnet der
+          # Knopf "In der App öffnen" auf der Webseite nichts.
+          if /usr/libexec/PlistBuddy -c "Print :CFBundleURLTypes" "$PLIST" 2>/dev/null | grep -q "$URL_SCHEME"; then
+            echo "URL-Schema:       $URL_SCHEME://"
+          else
+            echo "::error::URL-Schema $URL_SCHEME fehlt in der Info.plist (cordova-plugin-customurlscheme)."; FEHLER=1
+          fi
+
+          # Ohne das Kauf-Plugin gäbe es in TestFlight keinen Kaufknopf mit Preis,
+          # sondern dauerhaft "Preis wird geladen".
+          if cordova plugin ls | grep -q '^cordova-plugin-purchase'; then
+            echo "In-App-Kauf:      cordova-plugin-purchase installiert"
+          else
+            echo "::error::cordova-plugin-purchase ist nicht installiert."; FEHLER=1
+          fi
+          if grep -q 'StoreKit.framework' "$PBX"; then
+            echo "StoreKit:         eingebunden"
+          else
+            echo "::warning::StoreKit.framework nicht in der Projektdatei gefunden – im Build-Protokoll prüfen."
+          fi
+
+          # cordova-ios 8 legt ein eigenes PrivacyInfo.xcprivacy mit leerem
+          # NSPrivacyAccessedAPITypes an. Unseres nennt den Grund CA92.1 und
+          # ersetzt es an Ort und Stelle (zwei Manifeste wären mehrdeutig).
+          # Gesucht wird der Eintrag <string>CA92.1</string>, nicht nur der
+          # Text – der steht auch im Kommentar und täuschte sonst Erfolg vor.
+          MANIFESTE=$(find platforms/ios -name PrivacyInfo.xcprivacy -not -path '*/Plugins/*' | wc -l | tr -d ' ')
+          echo "Privacy-Manifeste der App: $MANIFESTE"
+          if [ "$MANIFESTE" -eq 0 ]; then
+            echo "::error::Kein PrivacyInfo.xcprivacy im Projekt. App Store Connect weist den Upload zurück."
+            FEHLER=1
+          else
+            for M in $(find platforms/ios -name PrivacyInfo.xcprivacy -not -path '*/Plugins/*'); do
+              if ! grep -q '<string>CA92.1</string>' "$M"; then
+                echo "Ersetze mitgeliefertes Manifest: $M"
+                cp ../res/ios/PrivacyInfo.xcprivacy "$M"
+              fi
+              grep -q '<string>CA92.1</string>' "$M" || { echo "::error::$M ohne Zugriffsgrund."; FEHLER=1; }
+            done
+          fi
+
+          exit $FEHLER
+
+      # Ohne Zertifikat läuft trotzdem ein Build – er beweist, dass der
+      # Quelltext samt Plugins übersetzt. Nur hochladen lässt er sich nicht.
+      - name: Unsigniert bauen (Kompilierbarkeit nachweisen)
+        working-directory: build
+        run: cordova build ios --debug --emulator
+
+      # ---- Signierter Build für den App Store ----
+      # Repository-Secrets (Settings -> Secrets and variables -> Actions):
+      #   IOS_CERTIFICATE_P12_BASE64   Distribution-Zertifikat samt Schlüssel (.p12, base64)
+      #                                – dasselbe wie bei FairMix ist erlaubt
+      #   IOS_CERTIFICATE_PASSWORD     Passwort dieses .p12
+      #   IOS_PROVISIONING_PROFILE     App-Store-Profil für de.drawmory.app (base64)
+      #                                – NEU, das FairMix-Profil passt nicht
+      #   IOS_TEAM_ID                  zehnstellige Team-ID
+      #   IOS_SIGNING_IDENTITY         z. B. "Apple Distribution: Simon Mählmann (TEAMID)"
+      - name: Signierschlüssel einrichten
+        id: signieren
+        env:
+          ZERT_B64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          ZERT_PW: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROFIL_B64: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          set -e
+          if [ -z "$ZERT_B64" ] || [ -z "$PROFIL_B64" ]; then
+            echo "vorhanden=false" >> "$GITHUB_OUTPUT"
+            echo "Kein Zertifikat hinterlegt – signierter Build wird übersprungen."
+            exit 0
+          fi
+
+          # Unsichtbare Zeichen entfernen, die beim Kopieren mitkommen können.
+          saeubern() {
+            printf '%s' "$1" | sed '1s/^\xEF\xBB\xBF//' | tr -d ' \t\r\n' | base64 -d
+          }
+          ZERT="$RUNNER_TEMP/dist.p12"
+          PROFIL="$RUNNER_TEMP/profil.mobileprovision"
+          saeubern "$ZERT_B64"   > "$ZERT"
+          saeubern "$PROFIL_B64" > "$PROFIL"
+          [ -s "$ZERT" ]   || { echo "::error::Das Zertifikat ließ sich nicht dekodieren."; exit 1; }
+          [ -s "$PROFIL" ] || { echo "::error::Das Profil ließ sich nicht dekodieren."; exit 1; }
+
+          # Das Profil muss zu Drawmory gehören. Das FairMix-Profil würde
+          # sonst erst beim Signieren mit einer schwer lesbaren Meldung scheitern.
+          PROFIL_PLIST=$(security cms -D -i "$PROFIL")
+          PROFIL_APP=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin <<< "$PROFIL_PLIST")
+          echo "Profil gilt für: $PROFIL_APP"
+          case "$PROFIL_APP" in
+            *".$APP_ID") ;;
+            *) echo "::error::Das Profil gehört zu '$PROFIL_APP', nicht zu $APP_ID. Für Drawmory ein eigenes App-Store-Profil anlegen."; exit 1 ;;
+          esac
+
+          BUND="$RUNNER_TEMP/signieren.keychain-db"
+          BUND_PW=$(uuidgen)
+          security create-keychain -p "$BUND_PW" "$BUND"
+          security set-keychain-settings -lut 21600 "$BUND"
+          security unlock-keychain -p "$BUND_PW" "$BUND"
+          security import "$ZERT" -P "$ZERT_PW" -A -t cert -f pkcs12 -k "$BUND"
+          # Ohne diese Zeile fragt codesign in einem Dialog – auf einem Läufer
+          # ohne Bildschirm läuft der Build dann in den Zeitablauf.
+          security set-key-partition-list -S apple-tool:,apple: -k "$BUND_PW" "$BUND" > /dev/null
+          security list-keychain -d user -s "$BUND" login.keychain-db
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$PROFIL_PLIST")
+          cp "$PROFIL" "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.mobileprovision"
+          echo "Profil installiert: $UUID"
+
+          rm -f "$ZERT" "$PROFIL"
+          echo "profil_uuid=$UUID" >> "$GITHUB_OUTPUT"
+          echo "vorhanden=true" >> "$GITHUB_OUTPUT"
+
+      - name: Signiert bauen (IPA für den App Store)
+        if: steps.signieren.outputs.vorhanden == 'true'
+        working-directory: build
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IDENTITAET: ${{ secrets.IOS_SIGNING_IDENTITY }}
+          PROFIL_UUID: ${{ steps.signieren.outputs.profil_uuid }}
+        run: |
+          set -e
+          cat > build.json <<JSON
+          {
+            "ios": {
+              "release": {
+                "codeSignIdentity": "$IDENTITAET",
+                "developmentTeam": "$TEAM_ID",
+                "provisioningProfile": "$PROFIL_UUID",
+                "packageType": "app-store",
+                "automaticProvisioning": false
+              }
+            }
+          }
+          JSON
+          cordova build ios --release --device
+          rm -f build.json
+
+      - name: IPA hochladen
+        if: steps.signieren.outputs.vorhanden == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: Drawmory-ios-ipa
+          path: build/platforms/ios/build/**/*.ipa
+          if-no-files-found: error
+
+      # ---- Upload nach App Store Connect / TestFlight ----
+      # Drei weitere Secrets (dieselben Werte wie bei FairMix sind erlaubt,
+      # der Schlüssel gilt für das ganze Konto):
+      #   ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8
+      #
+      # Nur bei manuellem Start ("Run workflow"): Jede hochgeladene
+      # Build-Nummer ist dauerhaft belegt, auch wenn der Build nie getestet
+      # wird. Vor dem nächsten Upload ios-CFBundleVersion in der config.xml
+      # anheben – validate.js prüft, dass README und App dazu passen.
+      - name: In App Store Connect hochladen
+        if: steps.signieren.outputs.vorhanden == 'true' && github.event_name == 'workflow_dispatch'
+        working-directory: build
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -e
+          if [ -z "$ASC_KEY_ID" ] || [ -z "$ASC_ISSUER_ID" ] || [ -z "$ASC_KEY_P8" ]; then
+            echo "Keine App-Store-Connect-Schlüssel hinterlegt – Upload übersprungen."
+            echo "Die IPA liegt trotzdem als Artefakt bereit."
+            exit 0
+          fi
+          mkdir -p "$HOME/private_keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+
+          IPA=$(find platforms/ios/build -name '*.ipa' | head -1)
+          [ -n "$IPA" ] || { echo "::error::Keine IPA gefunden."; exit 1; }
+          echo "Lade hoch: $IPA"
+
+          # Erst prüfen, dann senden: findet Plist- und Icon-Probleme, bevor
+          # eine Build-Nummer verbraucht ist.
+          xcrun altool --validate-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app -f "$IPA" -t ios \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+
+          rm -f "$HOME/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          echo "Hochgeladen. Nach 5–30 Minuten Verarbeitung erscheint der Build unter TestFlight."
+
+      - name: Schlüsselbund entfernen
+        if: always()
+        run: security delete-keychain "$RUNNER_TEMP/signieren.keychain-db" || true
