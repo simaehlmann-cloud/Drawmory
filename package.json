@@ -1,0 +1,14 @@
+{
+  "name": "drawmory",
+  "private": true,
+  "description": "Prüfwerkzeuge für Drawmory. Die App selbst braucht keine Pakete.",
+  "scripts": {
+    "validate": "node validate.js",
+    "test": "node smoketest.js"
+  },
+  "devDependencies": {
+    "jsqr": "1.4.0",
+    "playwright": "1.63.0",
+    "pngjs": "7.0.0"
+  }
+}

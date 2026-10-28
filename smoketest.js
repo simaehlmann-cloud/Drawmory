@@ -70,8 +70,8 @@ async function countColor(page, canvasId, token) {
   }, [canvasId, token]);
 }
 /* StoreKit-Nachbildung für den Vollversions-Test */
-const MOCK_STORE = `
-  window.cordova = { platformId: "ios" };
+const mockStore = platformId => `
+  window.cordova = { platformId: "${platformId}" };
   window.__buyCalls = 0;
   (function () {
     const L = {};
@@ -81,10 +81,11 @@ const MOCK_STORE = `
         return Promise.resolve(undefined); } }; } };
     const when = { productUpdated(f) { L.productUpdated = f; return when; }, approved(f) { L.approved = f; return when; },
       verified(f) { L.verified = f; return when; }, finished(f) { L.finished = f; return when; } };
-    window.CdvPurchase = { ProductType: { NON_CONSUMABLE: "non consumable" }, Platform: { APPLE_APPSTORE: "ios-appstore" },
+    window.CdvPurchase = { ProductType: { NON_CONSUMABLE: "non consumable" },
+      Platform: { APPLE_APPSTORE: "ios-appstore", GOOGLE_PLAY: "android-playstore" },
       ErrorCode: { PAYMENT_CANCELLED: 6777006 },
-      store: { register() {}, when() { return when; }, error() {},
-        initialize() { setTimeout(() => L.productUpdated(product), 10); return Promise.resolve([]); },
+      store: { register(list) { window.__registered = list; }, when() { return when; }, error() {},
+        initialize(pl) { window.__initialized = pl; setTimeout(() => L.productUpdated(product), 10); return Promise.resolve([]); },
         get() { return product; }, owned() { return product.owned; }, restorePurchases() { return Promise.resolve(); } } };
   })();`;
 
@@ -562,7 +563,7 @@ const MOCK_STORE = `
 
   console.log("Vollversion (App, nachgebildetes StoreKit)");
   const ctx4 = await browser.newContext({ viewport: { width: 1180, height: 820 }, locale: "de-DE" });
-  await ctx4.addInitScript(MOCK_STORE);
+  await ctx4.addInitScript(mockStore("ios"));
   const p4 = await ctx4.newPage();
   p4.on("pageerror", e => errors.push("App: " + e.message));
   await p4.goto(BASE);
@@ -601,7 +602,27 @@ const MOCK_STORE = `
   await p4.reload();
   await p4.evaluate(() => document.dispatchEvent(new Event("deviceready")));
   check(await p4.evaluate(() => isFull()), "Freischaltung bleibt nach Neustart");
+  check(await p4.evaluate(() => window.__registered[0].platform === "ios-appstore" && window.__initialized[0] === "ios-appstore"), "iOS meldet sich beim App Store an");
   await ctx4.close();
+
+  console.log("Vollversion unter Android (Google Play)");
+  const ctx5 = await browser.newContext({ viewport: { width: 1180, height: 820 }, locale: "de-DE" });
+  await ctx5.addInitScript(mockStore("android"));
+  const p5 = await ctx5.newPage();
+  p5.on("pageerror", e => errors.push("Android: " + e.message));
+  await p5.goto(BASE);
+  await p5.click('[data-action="introSkip"]');
+  await p5.evaluate(() => document.dispatchEvent(new Event("deviceready")));
+  await p5.waitForTimeout(100);
+  check(await p5.evaluate(() => window.__registered[0].platform === "android-playstore" && window.__initialized[0] === "android-playstore"), "Android meldet sich bei Google Play an");
+  check(await p5.evaluate(() => window.__registered[0].id === PRODUCT_ID), "Gleiche Produkt-ID in beiden Stores");
+  await p5.click('[data-to="templates"]');
+  await p5.click('[data-action="newTemplate"]');
+  check((await p5.textContent("#payFine")).includes("Google"), "Kaufdialog nennt unter Android das Google-Konto");
+  await p5.click("#btnBuy");
+  await p5.waitForTimeout(250);
+  check(await p5.evaluate(() => isFull()), "Kauf unter Android schaltet frei");
+  await ctx5.close();
 
   check(errors.length === 0, "Keine Fehler in der Konsole" + (errors.length ? ": " + errors.join(" | ") : ""));
   await browser.close();

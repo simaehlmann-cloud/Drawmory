@@ -5,7 +5,11 @@
 
 Motiv: Haus in blauer Tinte, darüber eine nachgezeichnete Kopie in Magenta,
 auf Rechenkästchen-Papier. iOS-Icons ohne Alphakanal (App Store Connect
-lehnt Transparenz ab)."""
+lehnt Transparenz ab).
+
+Android: klassische Icons je Dichte und adaptive Icons (Vordergrund mit
+transparentem Grund, Hintergrundfarbe aus res/android/colors.xml), wie bei
+FairMix. Der iOS-Workflow ruft dieses Skript vor jedem Build auf."""
 import os
 from PIL import Image, ImageDraw
 
@@ -15,17 +19,18 @@ GRID = (214, 225, 240)
 INK = (42, 59, 183)
 PEN = (217, 42, 110)
 
-def art(size, pad=0.0):
-    """Motiv auf quadratischer Fläche; pad = Rand für maskierbare Icons."""
+def art(size, pad=0.0, transparent=False):
+    """Motiv auf quadratischer Fläche; pad = Rand für maskierbare Icons.
+    transparent: ohne Papier und Raster (Vordergrund adaptiver Icons)."""
     S = 4                      # Supersampling
     W = size * S
-    im = Image.new("RGB", (W, W), PAPER)
+    im = Image.new("RGBA" if transparent else "RGB", (W, W), (0, 0, 0, 0) if transparent else PAPER)
     d = ImageDraw.Draw(im)
     inner = W * (1 - 2 * pad)
     off = W * pad
     def P(x, y):               # Koordinaten im Raum 0..96
         return (off + x / 96 * inner, off + y / 96 * inner)
-    if size >= 64:
+    if size >= 64 and not transparent:
         cell = inner / 12
         gw = max(1, int(W / 300))
         n = int(W / cell) + 2
@@ -66,4 +71,14 @@ splash = Image.new("RGB", (2732, 2732), PAPER)
 motif = art(700, 0.0)
 splash.paste(motif, ((2732 - 700) // 2, (2732 - 700) // 2))
 save(splash, "res", "ios", "Default@2x~universal~anyany.png")
+# Android: klassisch (48 dp) und adaptiver Vordergrund (108 dp, Motiv in der
+# sicheren Zone von 66 dp, also rund 19 % Rand je Seite)
+DICHTEN = {"ldpi": 0.75, "mdpi": 1, "hdpi": 1.5, "xhdpi": 2, "xxhdpi": 3, "xxxhdpi": 4}
+for name, f in DICHTEN.items():
+    save(art(round(48 * f), 0.04), "res", "android", f"icon_{name}.png")
+    save(art(round(108 * f), 0.2, transparent=True), "res", "android", f"icon_fg_{name}.png")
+farben = os.path.join(HERE, "res", "android", "colors.xml")
+with open(farben, "w", encoding="utf-8") as fh:
+    fh.write('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+             '    <color name="drawmory_icon_background">#F5F8FC</color>\n</resources>\n')
 print("Icons erzeugt")

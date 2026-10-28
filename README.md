@@ -6,8 +6,12 @@ Figur, rechts wird sie nachgezeichnet. Nach „Fertig“ legt die App beide
 
 Läuft als iOS-App (Cordova) und als installierbare Web-App (PWA) – vollständig
 offline, ohne Konto, ohne Werbung, ohne Tracking, ohne externe Bibliotheken.
+Android ist vorbereitet.
 
-Version 0.2.0 · versionCode 200
+**Weg in den App Store:** siehe [TESTFLIGHT.md](TESTFLIGHT.md) – Schritt für
+Schritt bis TestFlight, einschließlich In-App-Kauf.
+
+Version 0.2.1 · versionCode 201 · iOS-Build 201
 
 ## Funktionen
 
@@ -87,22 +91,38 @@ datenschutz(.html|-en.html) Datenschutzerklärung DE/EN
 impressum(.html|-en.html)   Impressum DE/EN (§ 5 DDG)
 config.xml                  Cordova-Konfiguration (iOS zuerst, Android vorbereitet)
 icon*.png                   PWA- und Store-Icons
-res/ios/                    iOS-Icons (ohne Alphakanal) und Startbild
-make-icons.py               erzeugt alle Icons neu
-validate.js                 statische Prüfung
+res/ios/                    iOS-Icons (ohne Alphakanal), Startbild, PrivacyInfo.xcprivacy
+res/android/                adaptive Android-Icons je Dichte und colors.xml
+make-icons.py               erzeugt alle Icons neu (läuft auch in den Workflows)
+validate.js                 statische Prüfung, gleicht auch die Workflows mit der App ab
 smoketest.js                Ablauftest im echten Browser
+package.json                Prüfwerkzeuge (Playwright, jsQR, pngjs) – nur für Tests
+.github/workflows/ios.yml    Prüfen, bauen, signieren, nach TestFlight hochladen
+.github/workflows/android.yml  Prüfen, Debug-APK, mit Keystore auch APK und AAB
+TESTFLIGHT.md               Anleitung bis TestFlight samt In-App-Kauf
 ```
+
+## Workflows
+
+| Workflow | Bei jedem Push | Bei „Run workflow“ |
+|---|---|---|
+| Build Drawmory (iOS) | Prüfungen, unsignierter und (mit Secrets) signierter Build, IPA als Artefakt | zusätzlich Upload nach App Store Connect / TestFlight |
+| Build Drawmory (Android) | Prüfungen, Debug-APK; mit Keystore-Secrets zusätzlich APK und AAB | wie Push |
+
+Der Upload nach App Store Connect ist an „Run workflow“ gebunden, weil jede
+hochgeladene Build-Nummer dauerhaft belegt ist. `validate.js` prüft das.
 
 ## Prüfen
 
 ```bash
 node validate.js        # Syntax, DE/EN vollständig, IDs, Aktionen, Manifest, Icons, Versionen
-npm i -D playwright jsqr pngjs && npx playwright install chromium
+npm install && npx playwright install chromium
 python3 -m http.server 8765 &
-node smoketest.js       # 134 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
+node smoketest.js       # 139 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
                         # Spiegeln/Drehen, Nikolaus, Gedächtnis, Mehrspieler, Editor,
                         # QR-Rücklesen, Pakete, Link- und App-Import, Vollversion
-                        # (nachgebildetes StoreKit), Einführung, DE/EN, Hochformat
+                        # (nachgebildetes StoreKit und Google Play), Einführung,
+                        # DE/EN, Hochformat
 ```
 
 ## Version anheben
@@ -110,10 +130,40 @@ node smoketest.js       # 134 Prüfungen: Level, Bewertung, Fehlerfarben, Maßst
 Drei Stellen müssen gleich sein, `validate.js` prüft das:
 `APP_VERSION` in index.html, `version` in config.xml, `CACHE` in sw.js – plus diese README.
 
+## Update einspielen (0.2.0 → 0.2.1)
+
+Nur diese Dateien ins Repo hochladen, vorhandene werden überschrieben:
+
+```
+.github/workflows/ios.yml          neu
+.github/workflows/android.yml      neu
+.gitignore                         neu
+package.json                       neu
+TESTFLIGHT.md                      neu
+res/ios/PrivacyInfo.xcprivacy      neu
+res/android/  (12 PNG + colors.xml) neu
+index.html        Kauf auch über Google Play (Android), Version 0.2.1
+config.xml        Version 0.2.1 / Build 201, adaptive Android-Icons
+sw.js             Cache-Name 0.2.1
+datenschutz.html, datenschutz-en.html   Kauf über Apple bzw. Google
+make-icons.py     erzeugt zusätzlich die Android-Icons
+validate.js       gleicht Workflows, Produkt-ID, URL-Schema, Privacy-Manifest ab
+smoketest.js      prüft den Kauf auch unter Android
+README.md
+```
+
+Auf der GitHub-Webseite: ZIP entpacken, im Repo „Add file → Upload files“,
+**den Inhalt** des entpackten Ordners hineinziehen (die Ordner `.github` und
+`res` mit), „Commit changes“. Achtung: Ordner, die mit einem Punkt beginnen
+(`.github`), blendet macOS im Finder aus – mit Cmd+Shift+Punkt einblenden.
+
 ## In-App-Kauf einrichten
+
+Ausführlich in [TESTFLIGHT.md](TESTFLIGHT.md), Schritte 6 und 7. Kurz:
 
 1. App Store Connect → App → In-App-Käufe → „Nicht-Verbrauchsartikel“ anlegen,
    Produkt-ID `de.drawmory.app.full` (= `PRODUCT_ID` in index.html), Preis wählen.
+   Für Google Play später dieselbe ID als Einmalkauf.
 2. Vertrag „Kostenpflichtige Apps“ und Bankdaten in App Store Connect müssen aktiv sein,
    sonst liefert StoreKit kein Produkt (der Kaufknopf bleibt bei „Preis wird geladen“).
 3. Testen mit einem Sandbox-Konto (App Store Connect → Benutzer → Sandbox).

@@ -856,7 +856,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
         <button type="button" class="btn pen big" id="btnBuy" data-action="buy"></button>
         <button type="button" class="btn" id="btnRestore" data-action="restore" data-i18n="restore">Käufe wiederherstellen</button>
       </div>
-      <p class="fineprint" data-i18n="payFine">Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.</p>
+      <p class="fineprint" id="payFine">Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.</p>
     </div>
   </div>
 
@@ -894,7 +894,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
    ================================================================= */
 
 /* -------------------- 1  Konstanten, Speicher -------------------- */
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.2.1";
 /* Adresse der Webfassung. QR-Codes verweisen hierhin; die Kamera eines
    anderen Geräts öffnet den Link, die App übernimmt die Vorlage aus dem
    Teil hinter dem #. Dieser Teil wird nie an einen Server übertragen. */
@@ -942,10 +942,11 @@ const I18N = {
     payPlayers: "Mehrspieler mit bis zu 4 Personen",
     payEditor: "Eigene Vorlagen zeichnen und teilen",
     payFine: "Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.",
+    payFineGoogle: "Bezahlt wird über dein Google-Konto. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Android-Geräten mit demselben Konto.",
     restore: "Käufe wiederherstellen",
     buyFor: "Für {price} freischalten",
     buyLoading: "Preis wird geladen …",
-    buyUnavailable: "Der App Store ist gerade nicht erreichbar. Versuche es später noch einmal.",
+    buyUnavailable: "Der Store ist gerade nicht erreichbar. Versuche es später noch einmal.",
     buyFailed: "Der Kauf wurde nicht abgeschlossen.",
     restoreNone: "Kein früherer Kauf gefunden.",
     unlockedToast: "Vollversion freigeschaltet. Viel Spaß!",
@@ -1171,10 +1172,11 @@ const I18N = {
     payPlayers: "Multiplayer with up to 4 players",
     payEditor: "Draw and share your own templates",
     payFine: "Payment goes through your Apple account. With “Restore purchases” the purchase also works on your other devices with the same Apple ID.",
+    payFineGoogle: "Payment goes through your Google account. With “Restore purchases” the purchase also works on your other Android devices with the same account.",
     restore: "Restore purchases",
     buyFor: "Unlock for {price}",
     buyLoading: "Loading price …",
-    buyUnavailable: "The App Store can't be reached right now. Please try again later.",
+    buyUnavailable: "The store can't be reached right now. Please try again later.",
     buyFailed: "The purchase wasn't completed.",
     restoreNone: "No earlier purchase found.",
     unlockedToast: "Full version unlocked. Have fun!",
@@ -3086,14 +3088,18 @@ const QR = (function () {
    geteilter Vorlagen, freies Spiel. Vollversion: alles.
    Die Sperre gilt nur in der App (window.cordova). Die Webfassung ist die
    Landeseite der QR-Codes und bleibt vollständig nutzbar.
-   Plugin: cordova-plugin-purchase (CdvPurchase, v13). Ohne Belegprüfung
-   auf einem Server gilt ein Kauf als bestätigt, sobald StoreKit ihn meldet. */
+   Plugin: cordova-plugin-purchase (CdvPurchase, v13), auf iOS über StoreKit,
+   auf Android über Google Play Billing. Ohne Belegprüfung auf einem Server
+   gilt ein Kauf als bestätigt, sobald der Store ihn meldet. */
 const PRODUCT_ID = "de.drawmory.app.full";
 const FREE_LEVELS = 10;
 const FREE_PLAYERS = 2;
 const shop = { ready: false, price: "", busy: false, error: "", reason: null };
 
 function inApp() { return !!window.cordova; }
+function onAndroid() { return !!(window.cordova && window.cordova.platformId === "android"); }
+/* Store der laufenden Plattform. Die Produkt-ID ist in beiden Stores gleich. */
+function shopPlatform(C) { return onAndroid() ? C.Platform.GOOGLE_PLAY : C.Platform.APPLE_APPSTORE; }
 function isFull() { return !inApp() || store.get("full", false) === true; }
 function setFull() {
   if (store.get("full", false) === true) return;
@@ -3108,8 +3114,8 @@ function setFull() {
 function initShop() {
   const C = window.CdvPurchase;
   if (!C || !C.store) return;
-  const st = C.store, P = C.Platform;
-  st.register([{ id: PRODUCT_ID, type: C.ProductType.NON_CONSUMABLE, platform: P.APPLE_APPSTORE }]);
+  const st = C.store, plat = shopPlatform(C);
+  st.register([{ id: PRODUCT_ID, type: C.ProductType.NON_CONSUMABLE, platform: plat }]);
   st.when()
     .productUpdated(p => {
       if (!p || p.id !== PRODUCT_ID) return;
@@ -3124,7 +3130,7 @@ function initShop() {
       shop.busy = false; updatePaywall();
     });
   if (st.error) st.error(err => { shop.busy = false; shop.error = (err && err.message) || t("buyFailed"); updatePaywall(); });
-  Promise.resolve(st.initialize([P.APPLE_APPSTORE])).then(() => {
+  Promise.resolve(st.initialize([plat])).then(() => {
     shop.ready = true;
     if (st.owned && st.owned(PRODUCT_ID)) setFull();
     updatePaywall();
@@ -3145,10 +3151,11 @@ function updatePaywall() {
   document.getElementById("btnRestore").disabled = !shop.ready || shop.busy;
   const m = document.getElementById("payMsg");
   m.hidden = !shop.error; m.textContent = shop.error;
+  document.getElementById("payFine").textContent = onAndroid() ? t("payFineGoogle") : t("payFine");
 }
 function buyFull() {
   const C = window.CdvPurchase;
-  const p = C && C.store && C.store.get(PRODUCT_ID, C.Platform.APPLE_APPSTORE);
+  const p = C && C.store && C.store.get(PRODUCT_ID, shopPlatform(C));
   const offer = p && p.getOffer && p.getOffer();
   if (!offer) { shop.error = t("buyUnavailable"); updatePaywall(); return; }
   shop.busy = true; shop.error = ""; updatePaywall();

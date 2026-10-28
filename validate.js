@@ -175,6 +175,39 @@ else {
   if (!errors.some(e => e.includes("Version") || e.includes("cached unter"))) O(`Version ${appVer} überall gleich`);
 }
 
+/* 7b. Workflows passen zur App */
+{
+  const appId = (cfg.match(/<widget id="([^"]+)"/) || [])[1];
+  const scheme = (cfg.match(/name="URL_SCHEME" value="([^"]+)"/) || [])[1];
+  const productId = (js.match(/const PRODUCT_ID = "([^"]+)";/) || [])[1];
+  if (!productId || !productId.startsWith(appId + ".")) E(`PRODUCT_ID "${productId}" beginnt nicht mit der Kennung ${appId}.`);
+  if (!/drawmory:\/\/import#t=/.test(js) || scheme !== "drawmory") E("URL-Schema in config.xml und App passen nicht zusammen");
+  for (const wf of [".github/workflows/ios.yml", ".github/workflows/android.yml"]) {
+    if (!fs.existsSync(wf)) { E("Workflow fehlt: " + wf); continue; }
+    const y = fs.readFileSync(wf, "utf8");
+    const wfId = (y.match(/APP_ID: (\S+)/) || [])[1];
+    if (wfId !== appId) E(`${wf}: APP_ID ${wfId}, config.xml sagt ${appId}`);
+    if (/\t/.test(y)) E(`${wf}: Tabulator gefunden – YAML erlaubt nur Leerzeichen`);
+    /* Jede Datei, die der Workflow ins Cordova-Projekt kopiert, muss existieren */
+    for (const m of y.matchAll(/^\s*cp ((?:[\w.-]+\.(?:html|json|js|png)\s+(?:\\\s*)?)+)build\/www\//gm))
+      for (const f of m[1].split(/[\s\\]+/).filter(Boolean)) if (!fs.existsSync(f)) E(`${wf} kopiert fehlende Datei ${f}`);
+    if (/node smoketest\.js/.test(y) && !fs.existsSync("package.json")) E(`${wf} braucht package.json für den Ablauftest`);
+  }
+  const ios = fs.existsSync(".github/workflows/ios.yml") ? fs.readFileSync(".github/workflows/ios.yml", "utf8") : "";
+  const wfScheme = (ios.match(/URL_SCHEME: (\S+)/) || [])[1];
+  if (wfScheme !== scheme) E(`ios.yml prüft URL-Schema ${wfScheme}, config.xml setzt ${scheme}`);
+  if (!/workflow_dispatch/.test((ios.match(/In App Store Connect hochladen[\s\S]*?run:/) || [""])[0]))
+    E("ios.yml: Upload nach App Store Connect muss an workflow_dispatch gebunden sein (Build-Nummern)");
+  const pm = "res/ios/PrivacyInfo.xcprivacy";
+  /* Nach dem Eintrag selbst suchen: "CA92.1" steht auch im Kommentar der Datei */
+  if (!fs.existsSync(pm) || !/<string>CA92\.1<\/string>/.test(fs.readFileSync(pm, "utf8").replace(/<!--[\s\S]*?-->/g, ""))) E("Privacy-Manifest fehlt oder nennt CA92.1 nicht");
+  /* Android: Vordergrund-Icons und Farbe des adaptiven Icons */
+  for (const m of cfg.matchAll(/foreground="([^"]+)"/g)) if (!fs.existsSync(m[1])) E("Android-Vordergrund fehlt: " + m[1]);
+  if (!fs.existsSync("res/android/colors.xml") || !/drawmory_icon_background/.test(fs.readFileSync("res/android/colors.xml", "utf8")))
+    E("res/android/colors.xml fehlt oder enthält drawmory_icon_background nicht");
+  if (!errors.some(e => /Workflow|yml|PRODUCT_ID|Schema|Privacy|Android/.test(e))) O(`Workflows passen zur App (${appId}, ${productId}, ${scheme}://)`);
+}
+
 /* 8. Sicherheitsregeln */
 if (/innerHTML\s*=\s*[^'"\n]*\b(name|tpl|text|value)\b/.test(js)) E("innerHTML mit Nutzerdaten gefunden – textContent verwenden");
 if (!/Content-Security-Policy/.test(html)) E("Content-Security-Policy fehlt");

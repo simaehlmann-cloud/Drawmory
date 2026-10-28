@@ -6,7 +6,7 @@
 
 /* Der Name trägt die App-Version. validate.js vergleicht ihn mit
    APP_VERSION in der index.html. */
-const CACHE = 'drawmory-0.2.0';
+const CACHE = 'drawmory-0.2.1';
 
 const ASSETS = [
   './',

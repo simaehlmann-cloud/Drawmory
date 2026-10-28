@@ -2,9 +2,9 @@
 <!-- Paketkennung: nach der ersten Veröffentlichung unveränderlich.
      Vor dem Anlegen in App Store Connect bewusst festlegen. -->
 <widget id="de.drawmory.app"
-        version="0.2.0"
-        android-versionCode="200"
-        ios-CFBundleVersion="200"
+        version="0.2.1"
+        android-versionCode="201"
+        ios-CFBundleVersion="201"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
 
@@ -69,7 +69,18 @@
         <preference name="android-compileSdkVersion" value="36" />
         <preference name="AndroidXEnabled" value="true" />
         <preference name="AndroidWindowSplashScreenBackground" value="#F5F8FC" />
-        <icon src="icon.png" />
+        <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/android/icon_fg_xxxhdpi.png" />
+
+        <!-- Farbe für den Hintergrund des adaptiven Icons -->
+        <resource-file src="res/android/colors.xml" target="/app/src/main/res/values/drawmory_colors.xml" />
+
+        <!-- Adaptives Icon je Bildschirmdichte (make-icons.py) -->
+        <icon density="ldpi"    background="@color/drawmory_icon_background" foreground="res/android/icon_fg_ldpi.png"    src="res/android/icon_ldpi.png" />
+        <icon density="mdpi"    background="@color/drawmory_icon_background" foreground="res/android/icon_fg_mdpi.png"    src="res/android/icon_mdpi.png" />
+        <icon density="hdpi"    background="@color/drawmory_icon_background" foreground="res/android/icon_fg_hdpi.png"    src="res/android/icon_hdpi.png" />
+        <icon density="xhdpi"   background="@color/drawmory_icon_background" foreground="res/android/icon_fg_xhdpi.png"   src="res/android/icon_xhdpi.png" />
+        <icon density="xxhdpi"  background="@color/drawmory_icon_background" foreground="res/android/icon_fg_xxhdpi.png"  src="res/android/icon_xxhdpi.png" />
+        <icon density="xxxhdpi" background="@color/drawmory_icon_background" foreground="res/android/icon_fg_xxxhdpi.png" src="res/android/icon_xxxhdpi.png" />
     </platform>
 
     <!-- QR-Bild und Link teilen. Auf dem iPad ist das Menü ein Popover –
@@ -77,9 +88,10 @@
     <plugin name="cordova-plugin-x-socialsharing" spec="^6.0.4" />
     <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
 
-    <!-- Vollversion als einmaliger In-App-Kauf (StoreKit). Produkt in
-         App Store Connect anlegen: Typ "Nicht-Verbrauchsartikel",
-         Produkt-ID de.drawmory.app.full (= PRODUCT_ID in index.html). -->
+    <!-- Vollversion als einmaliger In-App-Kauf. Produkt-ID in beiden Stores
+         de.drawmory.app.full (= PRODUCT_ID in index.html):
+         App Store Connect: Typ "Nicht-Verbrauchsartikel".
+         Play Console: "Einmalkauf" (In-App-Produkt). -->
     <plugin name="cordova-plugin-purchase" spec="^13.10.0" />
 
     <!-- drawmory://import#t=… öffnet die App und übernimmt Vorlagen.
