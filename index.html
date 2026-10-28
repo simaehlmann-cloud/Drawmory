@@ -1,0 +1,3559 @@
+<!DOCTYPE html>
+<html lang="de" data-theme="auto">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob: gap: content: filesystem:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob: content: filesystem:; connect-src 'self' blob: data: filesystem:; media-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>Drawmory</title>
+<meta name="description" content="Drawmory – Figuren anschauen, merken und nachzeichnen. Mit Leveln, Maßstab-Aufgaben, Mehrspieler und eigenen Vorlagen. Offline, ohne Konto, ohne Werbung.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F5F8FC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141A33" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Drawmory">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png" sizes="192x192">
+
+<style>
+/* =================================================================
+   Drawmory – Stylesheet
+   Bildsprache: Rechenkästchen-Papier. Die Vorlage ist blaue Tinte,
+   die eigene Zeichnung Magenta-Stift, Bewertungen Textmarker-Gelb.
+   ================================================================= */
+
+/* ---------- Design-Tokens (hell) ---------- */
+:root {
+  --paper: #F5F8FC;
+  --grid: #DFE7F2;
+  --grid-strong: #C6D5EA;
+  --canvas-grid: #DCE5F1;   /* Raster auf den Zeichenflächen */
+  --card: #FFFFFF;
+  --line: #D5DCEB;
+  --text: #1A2147;
+  --muted: #5B6488;
+  --ink: #2A3BB7;          /* Vorlage */
+  --ink-soft: #E4E8FB;
+  --pen: #D92A6E;          /* eigene Zeichnung */
+  --pen-soft: #FCE4EE;
+  --marker: #FFD23F;       /* Bewertung, Sterne */
+  --marker-text: #1A2147;
+  --ok: #17895A;
+  --danger: #C02E2E;
+  --hit: #17995F;          /* Ergebnis: trifft */
+  --near: #D99A00;         /* knapp */
+  --miss: #E0453A;         /* daneben */
+  --veil: rgba(20, 26, 51, .55);
+  --shadow: 0 1px 0 rgba(26,33,71,.05), 0 10px 28px -14px rgba(26,33,71,.35);
+  --font-display: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --r-sm: 10px; --r-md: 16px; --r-lg: 24px;
+  --tap: 48px;
+  color-scheme: light;
+}
+
+/* ---------- Dunkel: automatisch oder gewählt ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #131932; --grid: #1C2447; --grid-strong: #34417A; --canvas-grid: #2C3868;
+    --card: #1B2243; --line: #2E3866; --text: #EEF0FA; --muted: #A3AAC8;
+    --ink: #8D9DFF; --ink-soft: #262F6B; --pen: #FF5C9D; --pen-soft: #4A2142;
+    --marker: #FFD23F; --marker-text: #1A2147; --ok: #3CC98A; --danger: #FF6B6B; --hit: #3CC98A; --near: #F2C14E; --miss: #FF6B6B;
+    --veil: rgba(4, 6, 18, .72);
+    --shadow: 0 1px 0 rgba(0,0,0,.25), 0 12px 30px -14px rgba(0,0,0,.7);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #131932; --grid: #1C2447; --grid-strong: #34417A; --canvas-grid: #2C3868;
+  --card: #1B2243; --line: #2E3866; --text: #EEF0FA; --muted: #A3AAC8;
+  --ink: #8D9DFF; --ink-soft: #262F6B; --pen: #FF5C9D; --pen-soft: #4A2142;
+  --marker: #FFD23F; --marker-text: #1A2147; --ok: #3CC98A; --danger: #FF6B6B; --hit: #3CC98A; --near: #F2C14E; --miss: #FF6B6B;
+  --veil: rgba(4, 6, 18, .72);
+  --shadow: 0 1px 0 rgba(0,0,0,.25), 0 12px 30px -14px rgba(0,0,0,.7);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background-color: var(--paper);
+  /* Das ganze Spiel liegt auf Rechenkästchen-Papier */
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; border-radius: 6px; }
+[hidden] { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- App-Rahmen ---------- */
+#app {
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  height: 100vh; height: 100dvh;
+  display: flex; flex-direction: column;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; min-height: 60px; flex: 0 0 auto;
+}
+.topbar .title {
+  font-family: var(--font-display); font-weight: 800; font-size: 20px;
+  margin: 0; flex: 1 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.screen { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1 1 auto; min-height: 0; }
+.wrap { width: 100%; max-width: 880px; margin: 0 auto; padding: 8px 16px 32px; }
+
+/* ---------- Knöpfe ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: var(--tap); padding: 0 20px;
+  border-radius: 999px; border: 2px solid transparent;
+  font-weight: 700; font-size: 17px; letter-spacing: .01em;
+  background: var(--card); color: var(--text); border-color: var(--line);
+  transition: transform .08s ease, background-color .15s ease;
+  user-select: none; -webkit-user-select: none;
+}
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .45; cursor: default; transform: none; }
+.btn.ink { background: var(--ink); color: #fff; border-color: var(--ink); }
+.btn.pen { background: var(--pen); color: #fff; border-color: var(--pen); }
+.btn.ghost { background: transparent; border-color: transparent; }
+.btn.danger { color: var(--danger); }
+.btn.big { min-height: 60px; font-size: 20px; padding: 0 30px; font-family: var(--font-display); }
+.btn svg { width: 22px; height: 22px; flex: 0 0 auto; }
+.icon-btn {
+  width: var(--tap); height: var(--tap); flex: 0 0 auto;
+  display: inline-grid; place-items: center;
+  border-radius: 50%; border: 2px solid var(--line); background: var(--card); color: var(--text);
+}
+.icon-btn svg { width: 22px; height: 22px; }
+.icon-btn:active { transform: scale(.95); }
+svg.i { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Sprachumschalter mit Flaggen */
+.lang {
+  display: inline-flex; padding: 3px; gap: 2px; flex: 0 0 auto;
+  border-radius: 999px; background: var(--card); border: 2px solid var(--line);
+}
+.lang button {
+  border: 0; background: transparent; border-radius: 999px;
+  min-width: 44px; height: 38px; font-size: 22px; line-height: 1; padding: 0 8px;
+  opacity: .5; filter: grayscale(.6);
+}
+.lang button[aria-pressed="true"] { background: var(--ink-soft); opacity: 1; filter: none; }
+
+/* ---------- Startseite ---------- */
+.home { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: center; padding-top: 4px; }
+@media (min-width: 820px) and (min-aspect-ratio: 1/1) {
+  .home { grid-template-columns: 1.05fr 1fr; gap: 40px; min-height: calc(100dvh - 140px); }
+}
+.hero { text-align: left; }
+.wordmark {
+  font-family: var(--font-display); font-weight: 900; letter-spacing: -.02em;
+  font-size: clamp(48px, 9vw, 92px); line-height: .95; margin: 0 0 10px;
+}
+.wordmark .w-ink { color: var(--ink); }
+.wordmark .w-pen { color: var(--pen); }
+.tagline { font-size: clamp(18px, 2.4vw, 22px); color: var(--muted); margin: 0 0 18px; }
+.hero-art {
+  width: min(100%, 420px); aspect-ratio: 1; display: block;
+  background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow);
+}
+.hero-art .a-ink { stroke: var(--ink); }
+.hero-art .a-pen { stroke: var(--pen); opacity: .9; }
+.hero-art .a-grid { stroke: var(--grid); }
+.hero-art path { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.hero-art .badge rect { fill: var(--marker); }
+.hero-art .badge text { fill: var(--marker-text); font-family: var(--font-display); font-weight: 900; }
+@media (prefers-reduced-motion: no-preference) {
+  .hero-art .a-ink { stroke-dasharray: 400; stroke-dashoffset: 400; animation: draw 1.4s ease-out .2s forwards; }
+  .hero-art .a-pen { stroke-dasharray: 420; stroke-dashoffset: 420; animation: draw 1.6s ease-in-out 1.5s forwards; }
+  .hero-art .badge { opacity: 0; transform-origin: 74px 80px; animation: pop .45s cubic-bezier(.3,1.6,.5,1) 3.1s forwards; }
+}
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes pop { from { opacity: 0; transform: scale(.4) rotate(-12deg); } to { opacity: 1; transform: scale(1) rotate(-6deg); } }
+
+.menu { display: flex; flex-direction: column; gap: 12px; }
+.menu-main {
+  display: flex; align-items: center; gap: 18px; text-align: left;
+  padding: 20px 22px; border-radius: var(--r-lg); border: 0;
+  background: var(--ink); color: #fff; box-shadow: var(--shadow);
+}
+.menu-main .mm-icon { width: 64px; height: 64px; border-radius: 18px; background: rgba(255,255,255,.14); display: grid; place-items: center; flex: 0 0 auto; }
+.menu-main .mm-icon svg { width: 36px; height: 36px; }
+.menu-main strong { display: block; font-family: var(--font-display); font-size: 26px; line-height: 1.1; }
+.menu-main span { opacity: .85; font-size: 16px; }
+.menu-row {
+  display: flex; align-items: center; gap: 14px; text-align: left; width: 100%;
+  padding: 14px 16px; border-radius: var(--r-md);
+  background: var(--card); border: 2px solid var(--line);
+}
+.menu-row .mr-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; flex: 0 0 auto; }
+.menu-row .mr-icon svg { width: 26px; height: 26px; }
+.menu-row strong { display: block; font-size: 18px; }
+.menu-row span { color: var(--muted); font-size: 15px; }
+.tone-ink .mr-icon { background: var(--ink-soft); color: var(--ink); }
+.tone-pen .mr-icon { background: var(--pen-soft); color: var(--pen); }
+.tone-marker .mr-icon { background: var(--marker); color: var(--marker-text); }
+.progress-line { margin-top: 2px; font-size: 15px; opacity: .9; }
+.footer-links { display: flex; flex-wrap: nowrap; gap: 0; justify-content: center; margin-top: 14px; }
+@media (max-width: 380px) { .footer-links { flex-wrap: wrap; } }
+a.btn { text-decoration: none; }
+.footer-links .btn { min-height: 44px; font-size: 15px; padding: 0 8px; color: var(--muted); white-space: nowrap; flex: 0 0 auto; }
+
+/* ---------- Abschnittsüberschriften ---------- */
+h2.sec { font-family: var(--font-display); font-size: 22px; margin: 22px 0 4px; }
+p.sec-sub { color: var(--muted); margin: 0 0 12px; }
+.card { background: var(--card); border: 2px solid var(--line); border-radius: var(--r-md); padding: 16px; }
+
+/* ---------- Levelübersicht ---------- */
+.world { margin-bottom: 8px; }
+.levels { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
+.lvl {
+  position: relative; aspect-ratio: 1; border-radius: var(--r-md); border: 2px solid var(--line);
+  background: var(--card); padding: 8px; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+}
+.lvl canvas { width: 70%; aspect-ratio: 1; }
+.lvl .lvl-n { position: absolute; top: 6px; left: 10px; font-weight: 800; font-size: 14px; color: var(--muted); }
+.lvl .stars { font-size: 15px; letter-spacing: 1px; }
+.lvl.locked { opacity: .5; }
+.lvl.locked canvas { filter: grayscale(1) blur(1.5px); }
+.lvl .lock { position: absolute; inset: 0; display: grid; place-items: center; }
+.lvl .lock svg { width: 30px; height: 30px; color: var(--muted); }
+.lvl.current { border-color: var(--ink); box-shadow: 0 0 0 3px var(--ink-soft); }
+.star-on { color: #E8A900; }
+.star-off { color: var(--line); }
+
+/* ---------- Spielfeld ---------- */
+.game-head { display: flex; align-items: center; gap: 10px; padding: 0 16px; flex-wrap: wrap; }
+.task { font-family: var(--font-display); font-weight: 800; font-size: 19px; margin: 0; flex: 1 1 260px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+  background: var(--card); border: 2px solid var(--line); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+.chip svg { width: 16px; height: 16px; }
+.stage {
+  flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center;
+  gap: 20px; padding: 12px 16px;
+}
+.stage.portrait { flex-direction: column; gap: 12px; }
+.panel { position: relative; flex: 0 0 auto; }
+.panel-label {
+  position: absolute; top: -2px; left: 14px; transform: translateY(-50%); z-index: 2;
+  padding: 2px 10px; border-radius: 999px; font-size: 14px; font-weight: 800;
+  background: var(--paper); border: 2px solid currentColor;
+}
+.panel.left .panel-label { color: var(--ink); }
+.panel.right .panel-label { color: var(--pen); }
+.panel canvas {
+  display: block; width: 100%; height: 100%;
+  background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow);
+  touch-action: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+.panel.right canvas { cursor: crosshair; }
+.panel-veil {
+  position: absolute; inset: 0; border-radius: var(--r-lg); z-index: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 20px;
+  background: color-mix(in srgb, var(--card) 88%, transparent);
+}
+.panel-veil p { margin: 0; font-weight: 700; font-size: 19px; }
+.countdown {
+  width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--font-display); font-size: 36px; font-weight: 900; color: var(--ink);
+  background: conic-gradient(var(--ink) calc(var(--p, 1) * 360deg), var(--ink-soft) 0);
+  position: relative;
+}
+.countdown::before { content: ""; position: absolute; inset: 7px; border-radius: 50%; background: var(--card); }
+.countdown span { position: relative; }
+.hidden-card {
+  position: absolute; inset: 0; border-radius: var(--r-lg); display: grid; place-items: center; z-index: 1;
+  background:
+    repeating-linear-gradient(45deg, var(--ink-soft) 0 14px, transparent 14px 28px),
+    var(--card);
+}
+.hidden-card span {
+  font-family: var(--font-display); font-weight: 900; font-size: 64px; color: var(--ink);
+  width: 110px; height: 110px; border-radius: 50%; display: grid; place-items: center; background: var(--card);
+}
+.toolbar { display: flex; justify-content: center; align-items: center; gap: 10px; padding: 4px 16px 14px; flex-wrap: wrap; }
+.toolbar .spacer { flex: 0 1 40px; }
+
+/* ---------- Formulare / Einstellungen ---------- */
+.field { margin: 14px 0; }
+.field > label, .field > .label { display: block; font-weight: 700; margin-bottom: 6px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.seg button {
+  min-height: 44px; padding: 0 16px; border-radius: 999px; border: 2px solid var(--line);
+  background: var(--card); font-weight: 700;
+}
+.seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+.switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 2px solid var(--line); }
+.switch-row:first-child { border-top: 0; }
+.switch-row small { display: block; color: var(--muted); font-weight: 400; }
+.toggle {
+  width: 58px; height: 34px; border-radius: 999px; border: 0; position: relative; flex: 0 0 auto;
+  background: var(--line);
+}
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 28px; height: 28px; border-radius: 50%; background: #fff; transition: left .15s ease; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.toggle[aria-checked="true"] { background: var(--ok); }
+.toggle[aria-checked="true"]::after { left: 27px; }
+input[type="text"], textarea, .code-box { -webkit-user-select: text; user-select: text; }
+input[type="text"], textarea {
+  width: 100%; min-height: var(--tap); padding: 10px 14px; border-radius: var(--r-sm);
+  border: 2px solid var(--line); background: var(--card);
+}
+textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+.shape-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.shape-pick button {
+  aspect-ratio: 1; border-radius: var(--r-sm); border: 2px solid var(--line); background: var(--card);
+  padding: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+}
+.shape-pick button canvas { width: 62%; aspect-ratio: 1; }
+.shape-pick button span { font-size: 12px; font-weight: 600; line-height: 1.1; text-align: center; overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.shape-pick button[aria-pressed="true"] { border-color: var(--ink); background: var(--ink-soft); }
+.shape-pick .rand { font-family: var(--font-display); font-size: 30px; font-weight: 900; color: var(--ink); }
+.players { display: flex; flex-direction: column; gap: 8px; }
+.player-row { display: flex; align-items: center; gap: 10px; }
+.player-dot { width: 18px; height: 18px; border-radius: 50%; flex: 0 0 auto; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 22px; }
+
+/* ---------- Vorlagen ---------- */
+.tpl-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.tpl { display: flex; gap: 12px; align-items: center; padding: 10px; }
+.tpl canvas { width: 76px; height: 76px; flex: 0 0 auto; border-radius: var(--r-sm); background: var(--paper); }
+.tpl .tpl-body { flex: 1 1 auto; min-width: 0; }
+.tpl .tpl-name { font-weight: 800; margin: 0 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tpl .tpl-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.tpl .tpl-actions .icon-btn { width: 40px; height: 40px; }
+.tpl .tpl-actions .icon-btn svg { width: 19px; height: 19px; }
+.empty { text-align: center; padding: 32px 16px; color: var(--muted); }
+.empty svg { width: 64px; height: 64px; color: var(--grid-strong); }
+
+/* Editor */
+.editor-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: center; padding: 0 16px; }
+.hint { color: var(--muted); font-size: 15px; text-align: center; margin: 6px 16px 0; min-height: 22px; }
+
+/* ---------- Dialoge ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: var(--veil);
+}
+.sheet {
+  width: min(560px, 100%); max-height: 100%; overflow-y: auto;
+  background: var(--card); border-radius: var(--r-lg); padding: 22px; box-shadow: var(--shadow);
+}
+.sheet h2 { font-family: var(--font-display); font-size: 26px; margin: 0 0 8px; }
+.sheet-head { display: flex; align-items: flex-start; gap: 10px; }
+.sheet-head h2 { flex: 1 1 auto; }
+.sheet p { margin: 8px 0; }
+.sheet .legal-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* Ergebnis */
+.result-art { display: block; margin: 6px auto 0; width: min(340px, 72vw); aspect-ratio: 1; border-radius: var(--r-md); background: var(--paper); }
+.score-big {
+  font-family: var(--font-display); font-weight: 900; font-size: 64px; line-height: 1; text-align: center; margin: 14px 0 0;
+}
+.score-big mark { background: linear-gradient(transparent 52%, var(--marker) 52%, var(--marker) 92%, transparent 92%); color: inherit; padding: 0 6px; }
+.verdict { text-align: center; font-weight: 800; font-size: 20px; margin: 4px 0 2px; }
+.result-stars { text-align: center; font-size: 34px; letter-spacing: 6px; margin: 2px 0; }
+.result-stars span { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) {
+  .result-stars .star-on { animation: pop .4s cubic-bezier(.3,1.6,.5,1) both; }
+  .result-stars .star-on:nth-child(2) { animation-delay: .15s; }
+  .result-stars .star-on:nth-child(3) { animation-delay: .3s; }
+}
+.legend { display: flex; justify-content: center; gap: 18px; font-size: 14px; font-weight: 700; margin: 8px 0 0; }
+.legend i { display: inline-block; width: 18px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px; }
+@media (max-width: 480px) { .metrics { grid-template-columns: 1fr; } }
+.metric { border: 2px solid var(--line); border-radius: var(--r-sm); padding: 8px 12px; }
+.metric b { font-size: 22px; font-family: var(--font-display); }
+.metric small { display: block; color: var(--muted); font-size: 13px; line-height: 1.3; }
+
+/* Mehrspieler-Ergebnis */
+.handoff { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 14px; padding: 24px; }
+.handoff .big-name { font-family: var(--font-display); font-weight: 900; font-size: clamp(40px, 8vw, 72px); line-height: 1.05; margin: 0; }
+.handoff p { margin: 0; color: var(--muted); font-size: 19px; }
+.podium { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.podium .card { text-align: center; padding: 12px; }
+.podium canvas { width: 100%; aspect-ratio: 1; border-radius: var(--r-sm); background: var(--paper); display: block; }
+.podium .rank { font-family: var(--font-display); font-weight: 900; font-size: 22px; }
+.podium .pname { font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.podium .pscore { font-family: var(--font-display); font-weight: 900; font-size: 30px; }
+.podium .winner { border-color: var(--marker); box-shadow: 0 0 0 3px var(--marker); }
+.round-nav { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin: 6px 0 14px; }
+
+/* QR */
+.qr-wrap { display: grid; place-items: center; margin: 10px 0; }
+.qr-wrap canvas { width: min(300px, 70vw); aspect-ratio: 1; image-rendering: pixelated; background: #fff; border-radius: var(--r-sm); }
+.code-box { font-family: ui-monospace, Menlo, monospace; font-size: 13px; word-break: break-all; color: var(--muted); background: var(--paper); border-radius: var(--r-sm); padding: 8px 10px; }
+
+.legend i.lg-ink { background: var(--ink); }
+.legend i.lg-hit { background: var(--hit); }
+.legend i.lg-near { background: var(--near); }
+.legend i.lg-miss { background: var(--miss); }
+.legend { flex-wrap: wrap; gap: 6px 14px; }
+.note { text-align: center; color: var(--danger); font-weight: 700; margin: 4px 0; }
+.chip.rule { background: var(--marker); border-color: var(--marker); color: var(--marker-text); }
+.topbar .lang button { height: 34px; min-width: 40px; font-size: 20px; }
+
+/* Vollversion */
+.lvl .pro {
+  position: absolute; top: 6px; right: 8px; font-size: 11px; font-weight: 800; line-height: 1.4;
+  padding: 1px 7px; border-radius: 999px; background: var(--marker); color: var(--marker-text);
+}
+.paylist { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.paylist li { padding-left: 30px; position: relative; font-weight: 600; }
+.paylist li::before { content: "✓"; position: absolute; left: 6px; color: var(--ok); font-weight: 900; }
+.fineprint { font-size: 13px; color: var(--muted); }
+.seg button.locked::after, .btn.locked::after { content: " 🔒"; font-size: .8em; }
+
+/* Einführung */
+.intro { text-align: center; }
+.intro-art { width: min(340px, 72vw); margin: 0 auto 8px; }
+.intro-art svg { width: 100%; height: auto; display: block; }
+.intro-art .ia-card { fill: var(--paper); stroke: var(--line); stroke-width: 1.2; }
+.intro-art .ia-ink { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.intro-art .ia-pen { fill: none; stroke: var(--pen); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.intro-art .ia-hit { fill: none; stroke: var(--hit); stroke-width: 2.6; stroke-linecap: round; }
+.intro-art .ia-near { fill: none; stroke: var(--near); stroke-width: 2.6; stroke-linecap: round; }
+.intro-art .ia-miss { fill: none; stroke: var(--miss); stroke-width: 2.6; stroke-linecap: round; }
+.intro-art .ia-grid { stroke: var(--canvas-grid); stroke-width: .6; }
+.intro-art text { fill: var(--text); font-family: var(--font-display); font-weight: 900; }
+.dots { display: flex; gap: 6px; justify-content: center; margin: 12px 0 0; }
+.dots i { width: 8px; height: 8px; border-radius: 4px; background: var(--line); transition: width .2s ease; }
+.dots i.on { background: var(--ink); width: 22px; }
+
+/* Mehrere Vorlagen auswählen */
+.select-bar {
+  display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: var(--card); border-top: 2px solid var(--line);
+}
+.select-bar #selectCount { font-weight: 800; margin-right: 6px; }
+.tpl.selectable { cursor: pointer; text-align: left; font: inherit; color: inherit; width: 100%; }
+.tpl.selectable[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 3px var(--ink-soft); }
+.tpl .check { width: 30px; height: 30px; border-radius: 9px; border: 2px solid var(--line); display: grid; place-items: center; flex: 0 0 auto; color: transparent; font-weight: 900; }
+.tpl.selectable[aria-pressed="true"] .check { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+/* Hinweis-Toast */
+.toast {
+  position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 80;
+  transform: translate(-50%, calc(100% + 40px)); visibility: hidden;
+  transition: transform .25s ease, visibility 0s linear .25s;
+  background: var(--text); color: var(--paper); padding: 12px 18px; border-radius: 999px;
+  font-weight: 700; max-width: calc(100% - 32px); box-shadow: var(--shadow);
+  display: flex; align-items: center; gap: 12px;
+}
+.toast.show { transform: translate(-50%, 0); visibility: visible; transition: transform .25s ease; }
+/* über der Auswahlleiste statt darauf */
+body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
+.toast .btn { min-height: 36px; padding: 0 14px; font-size: 15px; }
+@media (prefers-reduced-motion: reduce) {
+  .toast, .btn, .toggle::after { transition: none; }
+}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============ Startseite ============ -->
+  <section class="screen" id="scr-home">
+    <header class="topbar">
+      <p class="title sr-only">Drawmory</p>
+      <span style="flex:1"></span>
+      <div class="lang" role="group" data-i18n-aria="langSwitch">
+        <button type="button" data-action="lang" data-lang="de" aria-label="Deutsch">🇩🇪</button>
+        <button type="button" data-action="lang" data-lang="en" aria-label="English">🇬🇧</button>
+      </div>
+      <button type="button" class="icon-btn" data-action="openSettings" data-i18n-aria="settings">
+        <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
+      </button>
+    </header>
+    <div class="scroll">
+      <div class="wrap home">
+        <div class="hero">
+          <h1 class="wordmark"><span class="w-ink">Draw</span><span class="w-pen">mory</span></h1>
+          <p class="tagline" data-i18n="tagline">Anschauen. Merken. Nachzeichnen.</p>
+          <svg class="hero-art" viewBox="0 0 96 96" role="img" data-i18n-aria="heroAlt">
+            <g class="a-grid" stroke-width=".4">
+              <path d="M8 0V96M16 0V96M24 0V96M32 0V96M40 0V96M48 0V96M56 0V96M64 0V96M72 0V96M80 0V96M88 0V96"/>
+              <path d="M0 8H96M0 16H96M0 24H96M0 32H96M0 40H96M0 48H96M0 56H96M0 64H96M0 72H96M0 80H96M0 88H96"/>
+            </g>
+            <path class="a-ink" stroke-width="2.6" d="M24 76 V44 L48 22 L72 44 V76 Z M24 44 H72 M42 76 V60 H54 V76"/>
+            <path class="a-pen" stroke-width="2.4" d="M25 75 C24.5 66 25.5 52 25 45 C33 37 40 30 48.5 23.5 C56 30 63 37 71 45.5 C71.5 55 70.5 66 71 75.5 C56 76.5 39 75 25 75 M25.5 45 C40 44 58 46 70.5 45.5 M42.5 75 C42.8 69 42 64 43 60.5 C47 60 51 60.5 54.5 60.8 C54 66 54.6 71 54.3 75.2"/>
+            <g class="badge"><rect x="56" y="70" width="34" height="18" rx="4"/><text x="73" y="83.5" text-anchor="middle" font-size="11">92 %</text></g>
+          </svg>
+        </div>
+        <nav class="menu">
+          <button type="button" class="menu-main" data-action="go" data-to="levels">
+            <span class="mm-icon"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg></span>
+            <span>
+              <strong data-i18n="playLevels">Level spielen</strong>
+              <span data-i18n="playLevelsSub">30 Level in 5 Welten</span>
+              <span class="progress-line" id="homeProgress"></span>
+            </span>
+          </button>
+          <button type="button" class="menu-row tone-ink" data-action="go" data-to="free">
+            <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/></svg></span>
+            <span><strong data-i18n="freePlay">Freies Spiel</strong><span data-i18n="freePlaySub">Figur und Regeln selbst wählen</span></span>
+          </button>
+          <button type="button" class="menu-row tone-pen" data-action="go" data-to="multiSetup">
+            <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 19c.6-3.4 2.8-5.5 5.5-5.5s4.9 2.1 5.5 5.5M14 14.3c.9-.5 1.9-.8 3-.8 2.4 0 4.1 1.8 4.5 4.5"/></svg></span>
+            <span><strong data-i18n="multiplayer">Mehrspieler</strong><span data-i18n="multiplayerSub">2 bis 4 Personen an einem iPad</span></span>
+          </button>
+          <button type="button" class="menu-row tone-marker" data-action="go" data-to="templates">
+            <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15l3-6 3 4 2-2"/></svg></span>
+            <span><strong data-i18n="templates">Meine Vorlagen</strong><span data-i18n="templatesSub">Eigene Figuren zeichnen und per QR-Code teilen</span></span>
+          </button>
+          <div class="footer-links">
+            <button type="button" class="btn ghost" data-action="openAbout" data-i18n="about">Über das Spiel</button>
+            <button type="button" class="btn ghost" data-action="legal" data-page="datenschutz" data-i18n="privacy">Datenschutz</button>
+            <button type="button" class="btn ghost" data-action="legal" data-page="impressum" data-i18n="imprint">Impressum</button>
+          </div>
+        </nav>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Levelübersicht ============ -->
+  <section class="screen" id="scr-levels" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="back" data-i18n-aria="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="title" data-i18n="playLevels">Level spielen</h1>
+      <div class="lang" role="group" data-i18n-aria="langSwitch">
+        <button type="button" data-action="lang" data-lang="de" aria-label="Deutsch">🇩🇪</button>
+        <button type="button" data-action="lang" data-lang="en" aria-label="English">🇬🇧</button>
+      </div>
+    </header>
+    <div class="scroll"><div class="wrap" id="levelList"></div></div>
+  </section>
+
+  <!-- ============ Freies Spiel: Einstellungen ============ -->
+  <section class="screen" id="scr-free" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="back" data-i18n-aria="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="title" data-i18n="freePlay">Freies Spiel</h1>
+      <div class="lang" role="group" data-i18n-aria="langSwitch">
+        <button type="button" data-action="lang" data-lang="de" aria-label="Deutsch">🇩🇪</button>
+        <button type="button" data-action="lang" data-lang="en" aria-label="English">🇬🇧</button>
+      </div>
+    </header>
+    <div class="scroll"><div class="wrap">
+      <h2 class="sec" data-i18n="shape">Figur</h2>
+      <div class="shape-pick" id="freeShapes"></div>
+      <h2 class="sec" data-i18n="rules">Regeln</h2>
+      <div class="card" id="freeRules"></div>
+      <div class="actions"><button type="button" class="btn pen big" data-action="startFree" data-i18n="start">Los geht's</button></div>
+    </div></div>
+  </section>
+
+  <!-- ============ Mehrspieler: Einstellungen ============ -->
+  <section class="screen" id="scr-multiSetup" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="back" data-i18n-aria="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="title" data-i18n="multiplayer">Mehrspieler</h1>
+      <div class="lang" role="group" data-i18n-aria="langSwitch">
+        <button type="button" data-action="lang" data-lang="de" aria-label="Deutsch">🇩🇪</button>
+        <button type="button" data-action="lang" data-lang="en" aria-label="English">🇬🇧</button>
+      </div>
+    </header>
+    <div class="scroll"><div class="wrap">
+      <h2 class="sec" data-i18n="players">Mitspielende</h2>
+      <div class="card">
+        <div class="seg" id="playerCount" role="group"></div>
+        <div class="players" id="playerNames" style="margin-top:12px"></div>
+      </div>
+      <h2 class="sec" data-i18n="rounds">Runden</h2>
+      <div class="card"><div class="seg" id="roundCount" role="group"></div></div>
+      <h2 class="sec" data-i18n="shapePool">Figuren</h2>
+      <div class="card"><div class="seg" id="poolPick" role="group"></div></div>
+      <h2 class="sec" data-i18n="rules">Regeln</h2>
+      <div class="card" id="multiRules"></div>
+      <div class="actions"><button type="button" class="btn pen big" data-action="startMulti" data-i18n="start">Los geht's</button></div>
+    </div></div>
+  </section>
+
+  <!-- ============ Übergabe im Mehrspieler ============ -->
+  <section class="screen" id="scr-handoff" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="quitGame" data-i18n-aria="quit"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h1 class="title" id="handoffRound"></h1>
+    </header>
+    <div class="handoff">
+      <span class="player-dot" id="handoffDot" style="width:28px;height:28px"></span>
+      <p class="big-name" id="handoffName"></p>
+      <p id="handoffText"></p>
+      <button type="button" class="btn pen big" data-action="beginTurn" data-i18n="start">Los geht's</button>
+    </div>
+  </section>
+
+  <!-- ============ Spielfeld ============ -->
+  <section class="screen" id="scr-game" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="quitGame" data-i18n-aria="quit"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h1 class="title" id="gameTitle"></h1>
+      <div class="chips" id="gameChips"></div>
+    </header>
+    <div class="game-head"><p class="task" id="gameTask"></p></div>
+    <div class="stage" id="stage">
+      <div class="panel left" id="panelL">
+        <span class="panel-label" data-i18n="original">Vorlage</span>
+        <canvas id="cvL" aria-hidden="true"></canvas>
+        <div class="hidden-card" id="hiddenCard" hidden><span>?</span></div>
+      </div>
+      <div class="panel right" id="panelR">
+        <span class="panel-label" id="rightLabel" data-i18n="yourDrawing">Deine Zeichnung</span>
+        <canvas id="cvR" data-i18n-aria="drawArea"></canvas>
+        <div class="panel-veil" id="lookVeil" hidden>
+          <div class="countdown" id="countdown"><span id="countNum">5</span></div>
+          <p data-i18n="memorize">Präg dir die Figur ein</p>
+          <button type="button" class="btn ink" data-action="skipLook" data-i18n="gotIt">Ich hab's mir gemerkt</button>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button type="button" class="btn" id="btnUndo" data-action="undo">
+        <svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+        <span data-i18n="undo">Rückgängig</span>
+      </button>
+      <button type="button" class="btn" id="btnClear" data-action="clearDrawing">
+        <svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/></svg>
+        <span data-i18n="clear">Löschen</span>
+      </button>
+      <span class="spacer"></span>
+      <button type="button" class="btn pen big" id="btnDone" data-action="finishDrawing" disabled>
+        <svg class="i" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+        <span data-i18n="done">Fertig</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ============ Mehrspieler-Ergebnis ============ -->
+  <section class="screen" id="scr-multiResult" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="home" data-i18n-aria="home"><svg class="i" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7M6 9.5V20h12V9.5"/></svg></button>
+      <h1 class="title" data-i18n="results">Ergebnis</h1>
+    </header>
+    <div class="scroll"><div class="wrap">
+      <p class="verdict" id="multiWinner" style="font-size:28px;font-family:var(--font-display)"></p>
+      <div class="round-nav" id="roundNav"></div>
+      <div class="podium" id="podium"></div>
+      <div class="actions">
+        <button type="button" class="btn pen big" data-action="startMulti" data-i18n="playAgain">Neue Runde</button>
+        <button type="button" class="btn" data-action="go" data-to="multiSetup" data-i18n="changeSetup">Einstellungen ändern</button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ============ Vorlagen ============ -->
+  <section class="screen" id="scr-templates" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="back" data-i18n-aria="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="title" data-i18n="templates">Meine Vorlagen</h1>
+      <div class="lang" role="group" data-i18n-aria="langSwitch">
+        <button type="button" data-action="lang" data-lang="de" aria-label="Deutsch">🇩🇪</button>
+        <button type="button" data-action="lang" data-lang="en" aria-label="English">🇬🇧</button>
+      </div>
+    </header>
+    <div class="scroll"><div class="wrap">
+      <div class="actions" style="margin:4px 0 18px;justify-content:flex-start">
+        <button type="button" class="btn ink" data-action="newTemplate">
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span data-i18n="newTemplate">Neue Vorlage</span>
+        </button>
+        <button type="button" class="btn" data-action="openImport">
+          <svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg><span data-i18n="import">Importieren</span>
+        </button>
+        <button type="button" class="btn" id="btnSelect" data-action="selectMode">
+          <svg class="i" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M15 7h6M18 4v6"/></svg><span data-i18n="shareSeveral">Mehrere teilen</span>
+        </button>
+      </div>
+      <div class="tpl-list" id="tplList"></div>
+    </div></div>
+    <div class="select-bar" id="selectBar" hidden>
+      <span id="selectCount"></span>
+      <button type="button" class="btn" data-action="selectCancel" data-i18n="cancel">Abbrechen</button>
+      <button type="button" class="btn ink" id="btnShareSel" data-action="shareSelected" data-i18n="makeQR">QR-Code erstellen</button>
+    </div>
+  </section>
+
+  <!-- ============ Editor ============ -->
+  <section class="screen" id="scr-editor" hidden>
+    <header class="topbar">
+      <button type="button" class="icon-btn" data-action="back" data-i18n-aria="back"><svg class="i" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h1 class="title" data-i18n="editorTitle">Vorlage zeichnen</h1>
+      <button type="button" class="btn ink" data-action="saveTemplate" data-i18n="save">Speichern</button>
+    </header>
+    <div class="editor-tools">
+      <input type="text" id="tplName" maxlength="30" data-i18n-ph="namePh" style="max-width:260px" autocomplete="off">
+      <div class="seg" role="group">
+        <button type="button" data-action="tool" data-tool="line" aria-pressed="true" data-i18n="toolLine">Linien</button>
+        <button type="button" data-action="tool" data-tool="free" aria-pressed="false" data-i18n="toolFree">Freihand</button>
+      </div>
+      <button type="button" class="btn" id="btnEndLine" data-action="endLine" data-i18n="endLine">Linie beenden</button>
+      <button type="button" class="icon-btn" data-action="editorUndo" data-i18n-aria="undo"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg></button>
+      <button type="button" class="icon-btn" data-action="editorClear" data-i18n-aria="clear"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/></svg></button>
+      <button type="button" class="btn" data-action="tryTemplate" data-i18n="tryIt">Ausprobieren</button>
+    </div>
+    <p class="hint" id="editorHint"></p>
+    <div class="stage" id="editorStage">
+      <div class="panel left" id="panelE"><canvas id="cvE" data-i18n-aria="drawArea"></canvas></div>
+    </div>
+  </section>
+
+  <!-- ============ Dialoge ============ -->
+  <div class="modal" id="mdl-result" hidden role="dialog" aria-modal="true" aria-labelledby="resVerdict">
+    <div class="sheet">
+      <canvas class="result-art" id="cvResult"></canvas>
+      <div class="legend">
+        <span><i class="lg-ink"></i><span data-i18n="original">Vorlage</span></span>
+        <span><i class="lg-hit"></i><span data-i18n="legendHit">trifft</span></span>
+        <span><i class="lg-near"></i><span data-i18n="legendNear">knapp</span></span>
+        <span><i class="lg-miss"></i><span data-i18n="legendMiss">daneben</span></span>
+      </div>
+      <p class="score-big"><mark id="resScore">0 %</mark></p>
+      <div class="result-stars" id="resStars"></div>
+      <p class="verdict" id="resVerdict"></p>
+      <p class="note" id="resNote" hidden></p>
+      <div class="metrics">
+        <div class="metric"><b id="resPrec"></b><small data-i18n="precision">Auf der Linie</small><small data-i18n="precisionHelp">Wie viel deiner Linie die Vorlage trifft</small></div>
+        <div class="metric"><b id="resRec"></b><small data-i18n="recall">Vollständig</small><small data-i18n="recallHelp">Wie viel der Vorlage du getroffen hast</small></div>
+        <div class="metric"><b id="resSize"></b><small data-i18n="sizeMetric">Größe</small><small data-i18n="sizeHelp">Wie gut die Größe passt</small></div>
+      </div>
+      <div class="actions" id="resActions"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-settings" hidden role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="setTitle" data-i18n="settings">Einstellungen</h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <div class="field"><span class="label" data-i18n="language">Sprache</span>
+        <div class="seg" role="group">
+          <button type="button" data-action="lang" data-lang="de">🇩🇪 Deutsch</button>
+          <button type="button" data-action="lang" data-lang="en">🇬🇧 English</button>
+        </div>
+      </div>
+      <div class="field"><span class="label" data-i18n="theme">Darstellung</span>
+        <div class="seg" role="group" id="themeSeg">
+          <button type="button" data-action="theme" data-theme="auto" data-i18n="themeAuto">Automatisch</button>
+          <button type="button" data-action="theme" data-theme="light" data-i18n="themeLight">Hell</button>
+          <button type="button" data-action="theme" data-theme="dark" data-i18n="themeDark">Dunkel</button>
+        </div>
+      </div>
+      <div class="switch-row" id="proRow" hidden>
+        <span><span data-i18n="fullVersion">Vollversion</span><small id="proStatus"></small></span>
+        <button type="button" class="btn" id="btnProRow" data-action="openPaywall" data-i18n="unlock">Freischalten</button>
+      </div>
+      <div class="switch-row">
+        <span data-i18n="sound">Töne</span>
+        <button type="button" class="toggle" role="switch" id="soundToggle" data-action="toggleSound" data-i18n-aria="sound"></button>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button type="button" class="btn danger" data-action="resetProgress" data-i18n="resetProgress">Fortschritt zurücksetzen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-about" hidden role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="aboutTitle" data-i18n="aboutTitle">Über Drawmory</h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p data-i18n="aboutText">Drawmory trainiert genaues Hinsehen, das Gedächtnis für Formen und das Gefühl für Größenverhältnisse.</p>
+      <p data-i18n="aboutHow">Links erscheint eine Figur, rechts zeichnest du sie nach. Manchmal bleibt sie stehen, manchmal nur ein paar Sekunden. In der Welt „Maßstab“ zeichnest du sie doppelt oder halb so groß.</p>
+      <h3 data-i18n="aboutScoringTitle">So wird bewertet</h3>
+      <p data-i18n="aboutScoring">Drawmory legt deine Zeichnung über die Vorlage und verschiebt sie dabei so, dass sie bestmöglich passt. Wo du zeichnest, ist also egal. Es zählen Form und Größe: wie viel deiner Linie auf der Vorlage liegt und wie viel der Vorlage du getroffen hast.</p>
+      <p data-i18n="aboutPrivacy">Drawmory läuft offline, ohne Konto, ohne Werbung und ohne Tracking. Alle Daten bleiben auf diesem Gerät.</p>
+      <p><strong id="aboutVersion"></strong><br>Wisdompeak Apps – Simon Mählmann</p>
+      <div class="legal-links">
+        <button type="button" class="btn" data-action="showIntro" data-i18n="showIntro">Einführung zeigen</button>
+        <button type="button" class="btn" data-action="legal" data-page="datenschutz" data-i18n="privacy">Datenschutz</button>
+        <button type="button" class="btn" data-action="legal" data-page="impressum" data-i18n="imprint">Impressum</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-share" hidden role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="shareTitle"></h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p data-i18n="shareHint">Mit der Kamera eines anderen Geräts scannen. Der Link öffnet Drawmory und übernimmt die Vorlage.</p>
+      <div class="qr-wrap"><canvas id="cvQR"></canvas></div>
+      <p class="hint" id="shareWarn" hidden></p>
+      <p class="code-box" id="shareCode"></p>
+      <div class="actions">
+        <button type="button" class="btn ink" data-action="shareQR" data-i18n="shareImage">QR-Code teilen</button>
+        <button type="button" class="btn" data-action="shareLink" data-i18n="shareLink">Link teilen</button>
+        <button type="button" class="btn" data-action="copyLink" data-i18n="copyLink">Link kopieren</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-import" hidden role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="importTitle" data-i18n="importTitle">Vorlage importieren</h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p data-i18n="importHint">Füge einen Drawmory-Link oder den Code darunter ein.</p>
+      <textarea id="importText" spellcheck="false" autocapitalize="off" autocomplete="off"></textarea>
+      <p class="hint" id="importMsg" style="text-align:left;margin:6px 0 0;color:var(--danger)"></p>
+      <div class="actions"><button type="button" class="btn ink" data-action="doImport" data-i18n="importBtn">Übernehmen</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-confirm" hidden role="dialog" aria-modal="true" aria-labelledby="confirmText">
+    <div class="sheet">
+      <p id="confirmText" style="font-weight:700;font-size:19px"></p>
+      <div class="actions">
+        <a class="btn" id="confirmExtra" hidden></a>
+        <button type="button" class="btn" data-action="confirmNo" data-i18n="cancel">Abbrechen</button>
+        <button type="button" class="btn ink" id="confirmYes" data-action="confirmYes">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-paywall" hidden role="dialog" aria-modal="true" aria-labelledby="payTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="payTitle" data-i18n="payTitle">Drawmory Vollversion</h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p id="payReason"></p>
+      <p data-i18n="payIntro">Ein einmaliger Kauf schaltet alles frei. Kein Abo, keine Werbung.</p>
+      <ul class="paylist">
+        <li data-i18n="payLevels">Alle 30 Level in 5 Welten</li>
+        <li data-i18n="payPlayers">Mehrspieler mit bis zu 4 Personen</li>
+        <li data-i18n="payEditor">Eigene Vorlagen zeichnen und teilen</li>
+      </ul>
+      <p class="note" id="payMsg" hidden></p>
+      <div class="actions">
+        <button type="button" class="btn pen big" id="btnBuy" data-action="buy"></button>
+        <button type="button" class="btn" id="btnRestore" data-action="restore" data-i18n="restore">Käufe wiederherstellen</button>
+      </div>
+      <p class="fineprint" data-i18n="payFine">Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.</p>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-intro" hidden role="dialog" aria-modal="true" aria-labelledby="introTitle">
+    <div class="sheet intro">
+      <div class="intro-art" id="introArt" aria-hidden="true"></div>
+      <h2 id="introTitle"></h2>
+      <p id="introText"></p>
+      <div class="dots" id="introDots" aria-hidden="true"></div>
+      <div class="actions">
+        <button type="button" class="btn ghost" id="btnIntroSkip" data-action="introSkip" data-i18n="skip">Überspringen</button>
+        <button type="button" class="btn pen" id="btnIntroNext" data-action="introNext"></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"><span id="toastText"></span></div>
+  <div class="toast" id="updateToast" role="status">
+    <span data-i18n="updateAvailable">Neue Version verfügbar</span>
+    <button type="button" class="btn ink" data-action="applyUpdate" data-i18n="update">Aktualisieren</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =================================================================
+   Drawmory
+   1  Konstanten, Speicher        8  Bewertung
+   2  Texte (DE/EN)               9  Mehrspieler
+   3  Figuren, Level, Verwandeln 10  Vorlagen und Editor
+   4  Navigation                 11  Teilen: Code, Link, QR
+   5  Zeichnen auf Canvas        12  Vollversion (In-App-Kauf)
+   6  Spielfeld-Layout           13  Einführung
+   7  Spielablauf                14  Einstellungen, Start
+   ================================================================= */
+
+/* -------------------- 1  Konstanten, Speicher -------------------- */
+const APP_VERSION = "0.2.0";
+/* Adresse der Webfassung. QR-Codes verweisen hierhin; die Kamera eines
+   anderen Geräts öffnet den Link, die App übernimmt die Vorlage aus dem
+   Teil hinter dem #. Dieser Teil wird nie an einen Server übertragen. */
+const SHARE_BASE = "https://simaehlmann-cloud.github.io/Drawmory/";
+const U = 96;                 // Koordinatenraum aller Figuren: 0..96
+const CELL = 8;               // Rasterkästchen = 8 Einheiten -> 12×12 Kästchen
+const LINE_W = 1.5;           // Strichstärke in Einheiten
+const MAX_POINTS = 600;       // Obergrenze für eine Vorlage (QR-Kapazität)
+const PLAYER_COLORS = ["#D92A6E", "#1E8FD6", "#E07B00", "#16996A"];
+
+const store = {
+  get(key, fallback) {
+    try {
+      const raw = localStorage.getItem("drawmory_" + key);
+      return raw === null ? fallback : JSON.parse(raw);
+    } catch (e) { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem("drawmory_" + key, JSON.stringify(value)); return true; }
+    catch (e) { return false; }
+  },
+  del(key) { try { localStorage.removeItem("drawmory_" + key); } catch (e) {} }
+};
+
+/* -------------------- 2  Texte -------------------- */
+const I18N = {
+  de: {
+    tagline: "Anschauen. Merken. Nachzeichnen.",
+    legendHit: "trifft",
+    legendNear: "knapp",
+    legendMiss: "daneben",
+    shareSeveral: "Mehrere teilen",
+    makeQR: "QR-Code erstellen",
+    selectedN: "{n} ausgewählt",
+    selectSome: "Tippe Vorlagen an",
+    fullVersion: "Vollversion",
+    unlock: "Freischalten",
+    proActive: "Freigeschaltet",
+    proFree: "Gratis-Version",
+    proBadge: "Vollversion",
+    showIntro: "Einführung zeigen",
+    payTitle: "Drawmory Vollversion",
+    payIntro: "Ein einmaliger Kauf schaltet alles frei. Kein Abo, keine Werbung.",
+    payLevels: "Alle 30 Level in 5 Welten",
+    payPlayers: "Mehrspieler mit bis zu 4 Personen",
+    payEditor: "Eigene Vorlagen zeichnen und teilen",
+    payFine: "Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.",
+    restore: "Käufe wiederherstellen",
+    buyFor: "Für {price} freischalten",
+    buyLoading: "Preis wird geladen …",
+    buyUnavailable: "Der App Store ist gerade nicht erreichbar. Versuche es später noch einmal.",
+    buyFailed: "Der Kauf wurde nicht abgeschlossen.",
+    restoreNone: "Kein früherer Kauf gefunden.",
+    unlockedToast: "Vollversion freigeschaltet. Viel Spaß!",
+    reasonLevels: "Level 11 bis 30 gehören zur Vollversion.",
+    reasonPlayers: "Mit mehr als 2 Personen zu spielen gehört zur Vollversion.",
+    reasonEditor: "Eigene Vorlagen zeichnen gehört zur Vollversion. Importierte Vorlagen kannst du kostenlos spielen.",
+    skip: "Überspringen",
+    next: "Weiter",
+    intro1Title: "Anschauen und nachzeichnen",
+    intro1Text: "Links siehst du die Vorlage. Zeichne sie rechts mit dem Finger oder dem Stift nach und tippe auf „Fertig“.",
+    intro2Title: "Wo du zeichnest, ist egal",
+    intro2Text: "Drawmory legt deine Zeichnung passend über die Vorlage. Es zählen Form und Größe.",
+    intro3Title: "Grün trifft, Rot liegt daneben",
+    intro3Text: "Im Ergebnis siehst du genau, wo deine Linie sitzt. Ab 55 % gibt es einen Stern und das nächste Level wird frei.",
+    worldMirror: "Spiegeln und Drehen", worldMirrorSub: "Zeichne das Spiegelbild oder die gedrehte Figur.",
+    task_mirrorV: "Spiegle die Figur an der senkrechten Achse.",
+    task_mirrorH: "Spiegle die Figur an der waagerechten Achse.",
+    task_rot90: "Drehe die Figur um 90° im Uhrzeigersinn.",
+    task_rot180: "Drehe die Figur um 180°.",
+    taskAlsoDouble: "Zeichne sie dabei doppelt so groß.",
+    taskAlsoHalf: "Zeichne sie dabei halb so groß.",
+    taskOneStroke: "Zeichne in einem Zug, ohne abzusetzen.",
+    chip_mirrorV: "spiegeln ↔",
+    chip_mirrorH: "spiegeln ↕",
+    chip_rot90: "drehen 90°",
+    chip_rot180: "drehen 180°",
+    chipOneStroke: "in einem Zug",
+    oneStrokeFail: "Nicht in einem Zug gezeichnet – höchstens 50 %.",
+    wrongOrientation: "Die Form stimmt, aber die Lage nicht. Schau noch einmal, wohin gespiegelt oder gedreht wird.",
+    transform: "Verwandeln",
+    trNone: "Keine",
+    trMirrorV: "Spiegeln ↔",
+    trMirrorH: "Spiegeln ↕",
+    trRot90: "90° drehen",
+    trRot180: "180° drehen",
+    packTitle: "{n} Vorlagen",
+    shareTitlePack: "{n} Vorlagen teilen",
+    importOkMany: "{n} Vorlagen übernommen.",
+    importSomeDup: "{n} Vorlagen übernommen, {d} waren schon vorhanden.",
+    importAskMany: "{n} Vorlagen hinzufügen: {names}?",
+    openInApp: "In der App öffnen",
+    qrLarge: "Großer QR-Code: Kamera ruhig und nah heranhalten.",
+    tooManyForQR: "Zu viele Punkte für einen QR-Code. Wähle weniger Vorlagen.",
+    heroAlt: "Ein Haus in blauer Tinte, darüber eine nachgezeichnete Kopie in Magenta, bewertet mit 92 Prozent",
+    langSwitch: "Sprache wechseln",
+    settings: "Einstellungen",
+    playLevels: "Level spielen",
+    playLevelsSub: "30 Level in 5 Welten",
+    progressStars: "{s} von {t} Sternen gesammelt",
+    freePlay: "Freies Spiel",
+    freePlaySub: "Figur und Regeln selbst wählen",
+    multiplayer: "Mehrspieler",
+    multiplayerSub: "2 bis 4 Personen an einem iPad",
+    templates: "Meine Vorlagen",
+    templatesSub: "Eigene Figuren zeichnen und per QR-Code teilen",
+    about: "Über das Spiel",
+    privacy: "Datenschutz",
+    imprint: "Impressum",
+    back: "Zurück",
+    home: "Startseite",
+    quit: "Spiel beenden",
+    close: "Schließen",
+    cancel: "Abbrechen",
+    world1: "Erste Linien", world1Sub: "Die Vorlage bleibt stehen. Zähle die Kästchen.",
+    world2: "Aus dem Gedächtnis", world2Sub: "Die Vorlage verschwindet nach ein paar Sekunden.",
+    world3: "Maßstab", world3Sub: "Doppelt oder halb so groß zeichnen.",
+    world4: "Profi", world4Sub: "Weniger Hilfen, schwierigere Formen.",
+    levelN: "Level {n}",
+    locked: "Gesperrt",
+    original: "Vorlage",
+    yourDrawing: "Deine Zeichnung",
+    drawArea: "Zeichenfläche",
+    taskSame: "Zeichne die Figur gleich groß nach.",
+    taskDouble: "Zeichne die Figur doppelt so groß.",
+    taskHalf: "Zeichne die Figur halb so groß.",
+    chipAlways: "bleibt sichtbar",
+    chipSeconds: "{n} s sichtbar",
+    chipGrid: "Raster",
+    chipNoGrid: "ohne Raster",
+    chipDouble: "2× so groß",
+    chipHalf: "½ so groß",
+    chipRuler: "Lineal",
+    memorize: "Präg dir die Figur ein",
+    gotIt: "Ich hab's mir gemerkt",
+    undo: "Rückgängig",
+    clear: "Löschen",
+    done: "Fertig",
+    precision: "Auf der Linie",
+    precisionHelp: "Wie viel deiner Linie auf der Vorlage liegt",
+    recall: "Vollständig",
+    recallHelp: "Wie viel der Vorlage du getroffen hast",
+    sizeMetric: "Größe",
+    sizeHelp: "Wie gut die Größe passt",
+    v3: "Meisterhaft!",
+    v2: "Sehr gut!",
+    v1: "Geschafft!",
+    v0: "Fast! Versuch es nochmal.",
+    retry: "Nochmal",
+    nextLevel: "Nächstes Level",
+    allLevels: "Levelübersicht",
+    otherShape: "Andere Figur",
+    allDone: "Alle Level geschafft!",
+    shape: "Figur",
+    rules: "Regeln",
+    random: "Zufall",
+    viewTime: "Sichtzeit",
+    always: "Dauerhaft",
+    seconds: "{n} s",
+    gridLeft: "Raster bei der Vorlage",
+    gridRight: "Raster auf der Zeichenfläche",
+    size: "Größe",
+    sizeSame: "Gleich",
+    sizeDouble: "Doppelt",
+    sizeHalf: "Halb",
+    ruler: "Lineal-Hilfe",
+    rulerHelp: "Fast gerade Striche werden automatisch gerade.",
+    start: "Los geht's",
+    players: "Mitspielende",
+    playerN: "Spieler {n}",
+    playerName: "Name von Spieler {n}",
+    rounds: "Runden",
+    shapePool: "Figuren",
+    poolEasy: "Leicht",
+    poolMedium: "Mittel",
+    poolHard: "Schwer",
+    poolOwn: "Eigene Vorlagen",
+    noOwnTemplates: "Du hast noch keine eigenen Vorlagen. Es wird mit „Mittel“ gespielt.",
+    roundOf: "Runde {r} von {n}",
+    handTo: "Gib das iPad an {name}. Die anderen schauen weg.",
+    handNext: "Fertig! Weiter geht es mit {name}.",
+    results: "Ergebnis",
+    winner: "{name} gewinnt!",
+    tie: "Unentschieden zwischen {names}!",
+    total: "Gesamt",
+    roundShort: "R{n}",
+    playAgain: "Neue Runde",
+    changeSetup: "Einstellungen ändern",
+    rank: "Platz {n}",
+    newTemplate: "Neue Vorlage",
+    import: "Importieren",
+    emptyTemplates: "Noch keine eigenen Vorlagen. Zeichne deine erste Figur oder importiere eine per Link.",
+    play: "Spielen",
+    edit: "Bearbeiten",
+    share: "Teilen",
+    delete: "Löschen",
+    confirmDelete: "„{name}“ wirklich löschen?",
+    editorTitle: "Vorlage zeichnen",
+    namePh: "Name, z. B. Rakete",
+    toolLine: "Linien",
+    toolFree: "Freihand",
+    endLine: "Linie beenden",
+    hintLine: "Tippe Punkte auf dem Raster an. Tippe den ersten Punkt erneut, um die Form zu schließen.",
+    hintFree: "Zeichne frei. Die Linie wird beim Loslassen geglättet.",
+    save: "Speichern",
+    saved: "„{name}“ gespeichert",
+    tryIt: "Ausprobieren",
+    needStroke: "Zeichne zuerst mindestens eine Linie.",
+    tooBig: "Die Figur hat zu viele Punkte für einen QR-Code. Vereinfache sie etwas.",
+    pointsCount: "{n} von {m} Punkten",
+    defaultName: "Meine Figur {n}",
+    discardChanges: "Ungespeicherte Änderungen verwerfen?",
+    discard: "Verwerfen",
+    shareTitle: "„{name}“ teilen",
+    shareHint: "Mit der Kamera eines anderen Geräts scannen. Der Link öffnet Drawmory und übernimmt die Vorlage.",
+    shareImage: "QR-Code teilen",
+    shareLink: "Link teilen",
+    copyLink: "Link kopieren",
+    copied: "Link kopiert",
+    copyFailed: "Kopieren nicht möglich. Markiere den Code und kopiere ihn von Hand.",
+    shareText: "Zeichne „{name}“ in Drawmory nach:",
+    importTitle: "Vorlage importieren",
+    importHint: "Füge einen Drawmory-Link oder den Code darunter ein.",
+    importBtn: "Übernehmen",
+    importOk: "„{name}“ ist jetzt bei deinen Vorlagen.",
+    importBad: "Das ist kein gültiger Drawmory-Code. Prüfe, ob der Link vollständig kopiert wurde.",
+    importDup: "„{name}“ ist schon bei deinen Vorlagen.",
+    importAsk: "Vorlage „{name}“ zu deinen Vorlagen hinzufügen?",
+    add: "Hinzufügen",
+    language: "Sprache",
+    theme: "Darstellung",
+    themeAuto: "Automatisch",
+    themeLight: "Hell",
+    themeDark: "Dunkel",
+    sound: "Töne",
+    resetProgress: "Fortschritt zurücksetzen",
+    confirmReset: "Alle Level-Ergebnisse löschen? Deine Vorlagen bleiben erhalten.",
+    resetDone: "Fortschritt zurückgesetzt",
+    reset: "Zurücksetzen",
+    aboutTitle: "Über Drawmory",
+    aboutText: "Drawmory trainiert genaues Hinsehen, das Gedächtnis für Formen und das Gefühl für Größenverhältnisse.",
+    aboutHow: "Links erscheint eine Figur, rechts zeichnest du sie nach. Manchmal bleibt sie stehen, manchmal nur ein paar Sekunden. In der Welt „Maßstab“ zeichnest du sie doppelt oder halb so groß, in „Spiegeln und Drehen“ als Spiegelbild oder gedreht.",
+    aboutScoringTitle: "So wird bewertet",
+    aboutScoring: "Drawmory legt deine Zeichnung über die Vorlage. Wo du zeichnest, ist egal. Es zählen drei Dinge: wie viel deiner Linie auf der Vorlage liegt, wie viel der Vorlage du getroffen hast und wie gut die Größe passt. Eine sauber gezeichnete Form, die nur etwas zu klein geraten ist, verliert also nur ein wenig. Im Ergebnis zeigen Farben, wo deine Linie trifft.",
+    aboutPrivacy: "Drawmory läuft offline, ohne Konto, ohne Werbung und ohne Tracking. Alle Daten bleiben auf diesem Gerät.",
+    version: "Version {v}",
+    storageFull: "Speichern nicht möglich. Der Speicher des Geräts ist voll.",
+    updateAvailable: "Neue Version verfügbar",
+    update: "Aktualisieren",
+    s_line: "Strich", s_slope: "Schräge", s_angle: "Winkel", s_square: "Quadrat", s_triangle: "Dreieck",
+    s_stairs: "Treppe", s_house: "Haus", s_arrow: "Pfeil", s_zigzag: "Zickzack", s_flag: "Fahne",
+    s_houseDoor: "Haus mit Tür", s_bolt: "Blitz", s_fish: "Fisch", s_boat: "Boot", s_rocket: "Rakete",
+    s_star: "Stern", s_nikolaus: "Haus vom Nikolaus", s_circle: "Kreis", s_spiral: "Spirale", s_heart: "Herz",
+    s_cube: "Würfel", s_tree: "Tannenbaum", s_kite: "Drachen", s_crown: "Krone"
+  },
+  en: {
+    tagline: "Look. Remember. Redraw.",
+    legendHit: "on target",
+    legendNear: "close",
+    legendMiss: "off",
+    shareSeveral: "Share several",
+    makeQR: "Create QR code",
+    selectedN: "{n} selected",
+    selectSome: "Tap templates to select",
+    fullVersion: "Full version",
+    unlock: "Unlock",
+    proActive: "Unlocked",
+    proFree: "Free version",
+    proBadge: "Full",
+    showIntro: "Show introduction",
+    payTitle: "Drawmory full version",
+    payIntro: "A one-time purchase unlocks everything. No subscription, no ads.",
+    payLevels: "All 30 levels in 5 worlds",
+    payPlayers: "Multiplayer with up to 4 players",
+    payEditor: "Draw and share your own templates",
+    payFine: "Payment goes through your Apple account. With “Restore purchases” the purchase also works on your other devices with the same Apple ID.",
+    restore: "Restore purchases",
+    buyFor: "Unlock for {price}",
+    buyLoading: "Loading price …",
+    buyUnavailable: "The App Store can't be reached right now. Please try again later.",
+    buyFailed: "The purchase wasn't completed.",
+    restoreNone: "No earlier purchase found.",
+    unlockedToast: "Full version unlocked. Have fun!",
+    reasonLevels: "Levels 11 to 30 are part of the full version.",
+    reasonPlayers: "Playing with more than 2 people is part of the full version.",
+    reasonEditor: "Drawing your own templates is part of the full version. Imported templates are free to play.",
+    skip: "Skip",
+    next: "Next",
+    intro1Title: "Look and redraw",
+    intro1Text: "The original is on the left. Redraw it on the right with your finger or a pencil, then tap “Done”.",
+    intro2Title: "Where you draw doesn't matter",
+    intro2Text: "Drawmory lays your drawing over the original. Shape and size are what count.",
+    intro3Title: "Green hits, red is off",
+    intro3Text: "The result shows exactly where your line sits. From 55 % you get a star and unlock the next level.",
+    worldMirror: "Mirror and rotate", worldMirrorSub: "Draw the mirror image or the rotated shape.",
+    task_mirrorV: "Mirror the shape across the vertical axis.",
+    task_mirrorH: "Mirror the shape across the horizontal axis.",
+    task_rot90: "Rotate the shape 90° clockwise.",
+    task_rot180: "Rotate the shape 180°.",
+    taskAlsoDouble: "Draw it twice as big.",
+    taskAlsoHalf: "Draw it half the size.",
+    taskOneStroke: "Draw it in one stroke without lifting.",
+    chip_mirrorV: "mirror ↔",
+    chip_mirrorH: "mirror ↕",
+    chip_rot90: "rotate 90°",
+    chip_rot180: "rotate 180°",
+    chipOneStroke: "one stroke",
+    oneStrokeFail: "Not drawn in one stroke – 50 % at most.",
+    wrongOrientation: "The shape is right, but the orientation isn't. Check again which way to mirror or rotate.",
+    transform: "Transform",
+    trNone: "None",
+    trMirrorV: "Mirror ↔",
+    trMirrorH: "Mirror ↕",
+    trRot90: "Rotate 90°",
+    trRot180: "Rotate 180°",
+    packTitle: "{n} templates",
+    shareTitlePack: "Share {n} templates",
+    importOkMany: "{n} templates added.",
+    importSomeDup: "{n} templates added, {d} were already there.",
+    importAskMany: "Add {n} templates: {names}?",
+    openInApp: "Open in the app",
+    qrLarge: "Large QR code: hold the camera steady and close.",
+    tooManyForQR: "Too many points for one QR code. Select fewer templates.",
+    heroAlt: "A house in blue ink with a redrawn copy in magenta on top, scored 92 percent",
+    langSwitch: "Change language",
+    settings: "Settings",
+    playLevels: "Play levels",
+    playLevelsSub: "30 levels in 5 worlds",
+    progressStars: "{s} of {t} stars collected",
+    freePlay: "Free play",
+    freePlaySub: "Pick a shape and the rules",
+    multiplayer: "Multiplayer",
+    multiplayerSub: "2 to 4 players on one iPad",
+    templates: "My templates",
+    templatesSub: "Draw your own shapes and share them by QR code",
+    about: "About the game",
+    privacy: "Privacy",
+    imprint: "Legal notice",
+    back: "Back",
+    home: "Home",
+    quit: "Quit game",
+    close: "Close",
+    cancel: "Cancel",
+    world1: "First lines", world1Sub: "The original stays on screen. Count the squares.",
+    world2: "From memory", world2Sub: "The original disappears after a few seconds.",
+    world3: "Scale", world3Sub: "Draw it twice as big or half the size.",
+    world4: "Pro", world4Sub: "Fewer aids, trickier shapes.",
+    levelN: "Level {n}",
+    locked: "Locked",
+    original: "Original",
+    yourDrawing: "Your drawing",
+    drawArea: "Drawing area",
+    taskSame: "Copy the shape at the same size.",
+    taskDouble: "Draw the shape twice as big.",
+    taskHalf: "Draw the shape half the size.",
+    chipAlways: "stays visible",
+    chipSeconds: "visible {n} s",
+    chipGrid: "Grid",
+    chipNoGrid: "no grid",
+    chipDouble: "2× the size",
+    chipHalf: "½ the size",
+    chipRuler: "Ruler",
+    memorize: "Memorize the shape",
+    gotIt: "Got it",
+    undo: "Undo",
+    clear: "Clear",
+    done: "Done",
+    precision: "On the line",
+    precisionHelp: "How much of your line lies on the original",
+    recall: "Complete",
+    recallHelp: "How much of the original you covered",
+    sizeMetric: "Size",
+    sizeHelp: "How well the size matches",
+    v3: "Masterful!",
+    v2: "Great job!",
+    v1: "Passed!",
+    v0: "Almost! Give it another go.",
+    retry: "Try again",
+    nextLevel: "Next level",
+    allLevels: "All levels",
+    otherShape: "Another shape",
+    allDone: "All levels completed!",
+    shape: "Shape",
+    rules: "Rules",
+    random: "Random",
+    viewTime: "Viewing time",
+    always: "Always",
+    seconds: "{n} s",
+    gridLeft: "Grid on the original",
+    gridRight: "Grid on the drawing area",
+    size: "Size",
+    sizeSame: "Same",
+    sizeDouble: "Double",
+    sizeHalf: "Half",
+    ruler: "Ruler assist",
+    rulerHelp: "Nearly straight strokes snap straight.",
+    start: "Start",
+    players: "Players",
+    playerN: "Player {n}",
+    playerName: "Name of player {n}",
+    rounds: "Rounds",
+    shapePool: "Shapes",
+    poolEasy: "Easy",
+    poolMedium: "Medium",
+    poolHard: "Hard",
+    poolOwn: "Your templates",
+    noOwnTemplates: "You don't have templates yet. Playing with “Medium”.",
+    roundOf: "Round {r} of {n}",
+    handTo: "Pass the iPad to {name}. Everyone else looks away.",
+    handNext: "Done! Next up: {name}.",
+    results: "Results",
+    winner: "{name} wins!",
+    tie: "It's a tie between {names}!",
+    total: "Total",
+    roundShort: "R{n}",
+    playAgain: "Play again",
+    changeSetup: "Change settings",
+    rank: "Place {n}",
+    newTemplate: "New template",
+    import: "Import",
+    emptyTemplates: "No templates yet. Draw your first shape or import one from a link.",
+    play: "Play",
+    edit: "Edit",
+    share: "Share",
+    delete: "Delete",
+    confirmDelete: "Delete “{name}”?",
+    editorTitle: "Draw a template",
+    namePh: "Name, e.g. Rocket",
+    toolLine: "Lines",
+    toolFree: "Freehand",
+    endLine: "End line",
+    hintLine: "Tap points on the grid. Tap the first point again to close the shape.",
+    hintFree: "Draw freely. The line is smoothed when you lift your finger.",
+    save: "Save",
+    saved: "“{name}” saved",
+    tryIt: "Try it",
+    needStroke: "Draw at least one line first.",
+    tooBig: "This shape has too many points for a QR code. Simplify it a little.",
+    pointsCount: "{n} of {m} points",
+    defaultName: "My shape {n}",
+    discardChanges: "Discard unsaved changes?",
+    discard: "Discard",
+    shareTitle: "Share “{name}”",
+    shareHint: "Scan with another device's camera. The link opens Drawmory and adds the template.",
+    shareImage: "Share QR code",
+    shareLink: "Share link",
+    copyLink: "Copy link",
+    copied: "Link copied",
+    copyFailed: "Copying isn't possible here. Select the code and copy it by hand.",
+    shareText: "Redraw “{name}” in Drawmory:",
+    importTitle: "Import template",
+    importHint: "Paste a Drawmory link or the code below it.",
+    importBtn: "Add",
+    importOk: "“{name}” is now in your templates.",
+    importBad: "That isn't a valid Drawmory code. Check that the whole link was copied.",
+    importDup: "“{name}” is already in your templates.",
+    importAsk: "Add the template “{name}” to your templates?",
+    add: "Add",
+    language: "Language",
+    theme: "Appearance",
+    themeAuto: "Automatic",
+    themeLight: "Light",
+    themeDark: "Dark",
+    sound: "Sounds",
+    resetProgress: "Reset progress",
+    confirmReset: "Delete all level results? Your templates are kept.",
+    resetDone: "Progress reset",
+    reset: "Reset",
+    aboutTitle: "About Drawmory",
+    aboutText: "Drawmory trains careful looking, memory for shapes and a feel for proportions.",
+    aboutHow: "A shape appears on the left and you redraw it on the right. Sometimes it stays, sometimes only for a few seconds. In the “Scale” world you draw it twice as big or half the size, in “Mirror and rotate” as a mirror image or rotated.",
+    aboutScoringTitle: "How scoring works",
+    aboutScoring: "Drawmory lays your drawing over the original. Where you draw doesn't matter. Three things count: how much of your line lies on the original, how much of the original you covered and how well the size matches. A clean shape that came out a little too small only loses a little. In the result, colors show where your line hits.",
+    aboutPrivacy: "Drawmory works offline, with no account, no ads and no tracking. All data stays on this device.",
+    version: "Version {v}",
+    storageFull: "Couldn't save. The device storage is full.",
+    updateAvailable: "New version available",
+    update: "Update",
+    s_line: "Line", s_slope: "Slope", s_angle: "Angle", s_square: "Square", s_triangle: "Triangle",
+    s_stairs: "Stairs", s_house: "House", s_arrow: "Arrow", s_zigzag: "Zigzag", s_flag: "Flag",
+    s_houseDoor: "House with door", s_bolt: "Lightning", s_fish: "Fish", s_boat: "Boat", s_rocket: "Rocket",
+    s_star: "Star", s_nikolaus: "Envelope house", s_circle: "Circle", s_spiral: "Spiral", s_heart: "Heart",
+    s_cube: "Cube", s_tree: "Fir tree", s_kite: "Kite", s_crown: "Crown"
+  }
+};
+let lang = "de";
+function t(key, vars) {
+  let s = (I18N[lang] && I18N[lang][key]);
+  if (s === undefined) s = I18N.de[key];
+  if (s === undefined) return key;
+  if (vars) s = s.replace(/\{(\w+)\}/g, (m, k) => (k in vars ? String(vars[k]) : m));
+  return s;
+}
+
+/* -------------------- 3  Figuren und Level -------------------- */
+function ngon(cx, cy, r, n, rot) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) {
+    const a = rot + i * 2 * Math.PI / n;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return pts;
+}
+function starPts(cx, cy, r1, r2, n) {
+  const pts = [];
+  for (let i = 0; i <= 2 * n; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / n;
+    const r = i % 2 === 0 ? r1 : r2;
+    pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+  }
+  return pts;
+}
+function heartPts() {
+  const pts = [];
+  for (let i = 0; i <= 64; i++) {
+    const a = i / 64 * 2 * Math.PI;
+    const x = 16 * Math.pow(Math.sin(a), 3);
+    const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+    pts.push([48 + x * 2.1, 46 - y * 2.1]);
+  }
+  return pts;
+}
+
+/* Alle Figuren im Raum 0..96, Rasterkästchen = 8 Einheiten */
+const SHAPES = {
+  line:     [[[16, 48], [80, 48]]],
+  slope:    [[[24, 72], [72, 24]]],
+  angle:    [[[24, 24], [24, 72], [72, 72]]],
+  square:   [[[24, 24], [72, 24], [72, 72], [24, 72], [24, 24]]],
+  triangle: [[[48, 16], [80, 72], [16, 72], [48, 16]]],
+  stairs:   [[[16, 80], [16, 64], [32, 64], [32, 48], [48, 48], [48, 32], [64, 32], [64, 16], [80, 16]]],
+  house:    [[[24, 80], [24, 40], [48, 16], [72, 40], [72, 80], [24, 80]], [[24, 40], [72, 40]]],
+  arrow:    [[[16, 48], [76, 48]], [[56, 28], [76, 48], [56, 68]]],
+  zigzag:   [[[8, 64], [24, 32], [40, 64], [56, 32], [72, 64], [88, 32]]],
+  flag:     [[[24, 88], [24, 16], [72, 16], [56, 32], [72, 48], [24, 48]]],
+  houseDoor:[[[24, 80], [24, 40], [48, 16], [72, 40], [72, 80], [24, 80]], [[24, 40], [72, 40]], [[40, 80], [40, 56], [56, 56], [56, 80]]],
+  bolt:     [[[56, 8], [24, 48], [48, 48], [40, 88], [72, 40], [48, 40], [56, 8]]],
+  fish:     [[[16, 48], [40, 32], [64, 48], [40, 64], [16, 48]], [[64, 48], [80, 32], [80, 64], [64, 48]]],
+  boat:     [[[16, 64], [80, 64], [68, 80], [28, 80], [16, 64]], [[48, 64], [48, 16]], [[48, 20], [72, 56], [48, 56]]],
+  rocket:   [[[40, 72], [40, 32], [48, 16], [56, 32], [56, 72], [40, 72]], [[40, 56], [32, 72], [40, 72]], [[56, 56], [64, 72], [56, 72]], [[44, 80], [48, 88], [52, 80]]],
+  star:     [starPts(48, 52, 38, 15, 5)],
+  nikolaus: [[[24, 80], [24, 40], [72, 40], [24, 80], [72, 80], [72, 40], [48, 16], [24, 40], [72, 80]]],
+  circle:   [ngon(48, 48, 30, 48, 0)],
+  spiral:   [[[48, 48], [56, 48], [56, 40], [40, 40], [40, 56], [64, 56], [64, 32], [32, 32], [32, 64], [72, 64], [72, 24], [24, 24], [24, 72]]],
+  heart:    [heartPts()],
+  cube:     [[[16, 40], [56, 40], [56, 80], [16, 80], [16, 40]], [[16, 40], [40, 16], [80, 16], [56, 40]], [[80, 16], [80, 56], [56, 80]]],
+  tree:     [[[48, 8], [72, 40], [56, 40], [80, 72], [16, 72], [40, 40], [24, 40], [48, 8]], [[40, 72], [40, 88], [56, 88], [56, 72]]],
+  kite:     [[[48, 8], [72, 40], [48, 72], [24, 40], [48, 8]], [[48, 8], [48, 72]], [[24, 40], [72, 40]], [[48, 72], [40, 80], [56, 88]]],
+  crown:    [[[16, 72], [16, 32], [32, 48], [48, 24], [64, 48], [80, 32], [80, 72], [16, 72]]]
+};
+const SHAPE_DIFFICULTY = {
+  easy:   ["line", "slope", "angle", "square", "triangle", "stairs", "house", "arrow"],
+  medium: ["zigzag", "flag", "houseDoor", "bolt", "fish", "boat", "kite", "crown"],
+  hard:   ["rocket", "star", "nikolaus", "circle", "spiral", "heart", "cube", "tree"]
+};
+
+/* view: 0 = dauerhaft, sonst Sekunden. scale: 1, 2 oder 0.5 */
+const WORLDS = [
+  { key: "world1", levels: [
+    { shape: "line",     view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "angle",    view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "square",   view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "triangle", view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "stairs",   view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "house",    view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false }
+  ]},
+  { key: "world2", levels: [
+    { shape: "arrow",    view: 6, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "zigzag",   view: 6, gridL: true,  gridR: true,  scale: 1, ruler: true },
+    { shape: "flag",     view: 5, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "houseDoor",view: 5, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "bolt",     view: 4, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "fish",     view: 3, gridL: true,  gridR: true,  scale: 1, ruler: false }
+  ]},
+  { key: "world3", levels: [
+    { shape: "square",   view: 0, gridL: true,  gridR: true,  scale: 2,   ruler: true },
+    { shape: "triangle", view: 0, gridL: true,  gridR: true,  scale: 2,   ruler: true },
+    { shape: "stairs",   view: 0, gridL: true,  gridR: true,  scale: 0.5, ruler: true },
+    { shape: "arrow",    view: 0, gridL: true,  gridR: true,  scale: 2,   ruler: false },
+    { shape: "boat",     view: 0, gridL: true,  gridR: true,  scale: 0.5, ruler: false },
+    { shape: "rocket",   view: 0, gridL: true,  gridR: true,  scale: 2,   ruler: false }
+  ]},
+  { key: "worldMirror", levels: [
+    { shape: "flag",     view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  transform: "mirrorV" },
+    { shape: "stairs",   view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  transform: "mirrorH" },
+    { shape: "arrow",    view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  transform: "rot90" },
+    { shape: "fish",     view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false, transform: "mirrorV" },
+    { shape: "bolt",     view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false, transform: "rot180" },
+    { shape: "flag",     view: 5, gridL: true,  gridR: true,  scale: 1, ruler: false, transform: "rot90" }
+  ]},
+  { key: "world4", levels: [
+    { shape: "star",     view: 0, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "nikolaus", view: 5, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "circle",   view: 0, gridL: false, gridR: false, scale: 1, ruler: false },
+    { shape: "spiral",   view: 6, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "heart",    view: 4, gridL: false, gridR: false, scale: 1, ruler: false },
+    { shape: "cube",     view: 0, gridL: true,  gridR: false, scale: 2, ruler: false }
+  ]}
+];
+/* Fortschritt wird je Level-ID gespeichert (Welt + Nummer), nicht nach
+   Position. So bleibt er erhalten, wenn später Welten dazukommen. */
+const LEVELS = [];
+WORLDS.forEach((w, wi) => w.levels.forEach((l, li) =>
+  LEVELS.push(Object.assign({ world: wi, id: w.key + "-" + (li + 1), transform: "none" }, l))));
+
+/* Verwandlungen im Raum 0..96 (y zeigt nach unten) */
+const TRANSFORMS = {
+  none:    p => [p[0], p[1]],
+  mirrorV: p => [U - p[0], p[1]],
+  mirrorH: p => [p[0], U - p[1]],
+  rot90:   p => [U - p[1], p[0]],      // im Uhrzeigersinn
+  rot180:  p => [U - p[0], U - p[1]]
+};
+/* nur für den Lagenvergleich, keine eigene Aufgabe */
+const EXTRA_TRANSFORMS = { rot270: p => [p[1], U - p[0]] };   // gegen den Uhrzeigersinn
+function transformStrokes(strokes, tr) {
+  const f = TRANSFORMS[tr] || EXTRA_TRANSFORMS[tr] || TRANSFORMS.none;
+  return strokes.map(s => s.map(f));
+}
+/* Alle Lagen, mit denen eine Spiegel- oder Drehaufgabe verwechselt werden
+   kann. rot270 gibt es nur hier, nicht als eigene Aufgabe. */
+const WRONG_ORIENTATIONS = ["none", "mirrorV", "mirrorH", "rot90", "rot180", "rot270"];
+/* Figuren, die in einem Zug gezeichnet werden müssen */
+const ONE_STROKE = new Set(["nikolaus"]);
+
+function shapeName(id) { return t("s_" + id); }
+function getProgress() { const p = store.get("progress", {}); return (p && typeof p === "object") ? p : {}; }
+function bestOf(i) { const v = getProgress()[LEVELS[i].id]; return typeof v === "number" ? v : null; }
+function starsFor(score) { return score >= 90 ? 3 : score >= 75 ? 2 : score >= 55 ? 1 : 0; }
+function isUnlocked(i) {
+  if (i === 0) return true;
+  const best = bestOf(i - 1);
+  return best !== null && starsFor(best) >= 1;
+}
+
+/* -------------------- 4  Navigation -------------------- */
+const SCREENS = ["home", "levels", "free", "multiSetup", "handoff", "game", "multiResult", "templates", "editor"];
+let currentScreen = "home";
+const navStack = [];
+const timers = new Set();
+
+function later(fn, ms) { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); return id; }
+function clearTimers() { timers.forEach(id => { clearTimeout(id); clearInterval(id); }); timers.clear(); }
+
+function showScreen(name, opts) {
+  opts = opts || {};
+  if (!SCREENS.includes(name)) return;
+  if (name !== currentScreen && !opts.noPush) navStack.push(currentScreen);
+  clearTimers();
+  if (name !== "templates") { selecting = false; selected.clear(); document.body.classList.remove("has-bar"); }
+  SCREENS.forEach(s => { document.getElementById("scr-" + s).hidden = (s !== name); });
+  currentScreen = name;
+  const renderers = {
+    home: renderHome, levels: renderLevels, free: renderFree, multiSetup: renderMultiSetup,
+    templates: renderTemplates
+  };
+  if (renderers[name]) renderers[name]();
+  if (name === "game") requestAnimationFrame(layoutGame);
+  if (name === "editor") requestAnimationFrame(layoutEditor);
+}
+function goBack() {
+  let prev = navStack.pop();
+  while (prev && (prev === "game" || prev === "handoff" || prev === currentScreen)) prev = navStack.pop();
+  showScreen(prev || "home", { noPush: true });
+}
+function goHome() { navStack.length = 0; showScreen("home", { noPush: true }); }
+
+function openModal(id) {
+  document.querySelectorAll(".modal").forEach(m => { if (m.id !== id) m.hidden = true; });
+  const m = document.getElementById(id);
+  m.hidden = false;
+  const focusable = m.querySelector("textarea, input, .btn.ink, .btn.pen, button");
+  if (focusable) setTimeout(() => focusable.focus({ preventScroll: true }), 30);
+}
+function closeModals() { document.querySelectorAll(".modal").forEach(m => { m.hidden = true; }); }
+
+let toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById("toast");
+  document.getElementById("toastText").textContent = msg;
+  el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("show"), 2800);
+}
+
+let confirmHandler = null;
+function confirmBox(text, yesLabel, onYes, extra) {
+  const ex = document.getElementById("confirmExtra");
+  ex.hidden = !extra;
+  if (extra) { ex.textContent = extra.label; ex.href = extra.href; }
+  else ex.removeAttribute("href");
+  document.getElementById("confirmText").textContent = text;
+  document.getElementById("confirmYes").textContent = yesLabel;
+  confirmHandler = onYes;
+  openModal("mdl-confirm");
+}
+
+/* -------------------- 5  Zeichnen auf Canvas -------------------- */
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+/* Passt die Pixelgröße eines Canvas an seine angezeigte Größe an. */
+function fitCanvas(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const r = cv.getBoundingClientRect();
+  const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  return cv.width / U;   // Pixel je Einheit
+}
+
+function drawGrid(ctx, size, cellPx, offset) {
+  ctx.save();
+  ctx.lineWidth = Math.max(1, size / 480);
+  const n = Math.ceil(size / cellPx) + 1;
+  const ox = ((offset ? offset[0] : 0) % cellPx + cellPx) % cellPx;
+  const oy = ((offset ? offset[1] : 0) % cellPx + cellPx) % cellPx;
+  ctx.strokeStyle = css("--canvas-grid");
+  ctx.beginPath();
+  for (let i = 0; i < n; i++) {
+    const x = Math.round(ox + i * cellPx) + .5, y = Math.round(oy + i * cellPx) + .5;
+    ctx.moveTo(x, 0); ctx.lineTo(x, size);
+    ctx.moveTo(0, y); ctx.lineTo(size, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+/* strokes in Einheiten; k = Pixel je Einheit; off = Verschiebung in Pixeln */
+function drawStrokes(ctx, strokes, k, color, width, off) {
+  const ox = off ? off[0] : 0, oy = off ? off[1] : 0;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.fillStyle = color;
+  ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const s of strokes) {
+    if (!s.length) continue;
+    if (s.length === 1) {
+      ctx.beginPath(); ctx.arc(ox + s[0][0] * k, oy + s[0][1] * k, width / 2, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
+    ctx.beginPath();
+    ctx.moveTo(ox + s[0][0] * k, oy + s[0][1] * k);
+    for (let i = 1; i < s.length; i++) ctx.lineTo(ox + s[i][0] * k, oy + s[i][1] * k);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function bbox(strokes) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const s of strokes) for (const p of s) {
+    if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1];
+  }
+  if (!isFinite(x0)) return { x0: 0, y0: 0, x1: 0, y1: 0, w: 0, h: 0 };
+  return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
+}
+
+/* Vorschaubild einer Figur, mittig eingepasst */
+function drawThumb(cv, strokes, color) {
+  const k = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const b = bbox(strokes);
+  const span = Math.max(b.w, b.h, 24);
+  const s = (U * 0.84) / span;
+  const pts = strokes.map(st => st.map(p => [(p[0] - b.x0 - b.w / 2) * s + U / 2, (p[1] - b.y0 - b.h / 2) * s + U / 2]));
+  drawStrokes(ctx, pts, k, color || css("--ink"), Math.max(2, k * 3.4));
+}
+
+/* -------------------- 6  Spielfeld-Layout -------------------- */
+const game = {
+  round: null,        // { shapeId, strokes, name, settings, mode }
+  drawn: [],          // eigene Striche in Einheiten
+  active: null,       // aktueller Strich
+  pointerId: null,
+  sawPen: false,      // Apple Pencil erkannt -> Finger ignorieren (Handballen)
+  locked: false,      // Zeichnen gesperrt, solange die Vorlage eingeprägt wird
+  hidden: false,
+  onFinish: null
+};
+
+function layoutPanels(stageEl, panels) {
+  const r = stageEl.getBoundingClientRect();
+  const gap = 20, pad = 8;
+  const w = r.width - 32, h = r.height - 24;
+  let side;
+  if (panels.length === 1) {
+    side = Math.min(w, h);
+    stageEl.classList.remove("portrait");
+  } else {
+    const sideLand = Math.min((w - gap) / 2, h);
+    const sidePort = Math.min(w, (h - gap) / 2);
+    const portrait = sidePort > sideLand;
+    stageEl.classList.toggle("portrait", portrait);
+    side = Math.max(sideLand, sidePort);
+  }
+  side = Math.max(120, Math.floor(side - pad));
+  panels.forEach(p => { p.style.width = side + "px"; p.style.height = side + "px"; });
+}
+
+function layoutGame() {
+  if (currentScreen !== "game") return;
+  layoutPanels(document.getElementById("stage"), [document.getElementById("panelL"), document.getElementById("panelR")]);
+  renderLeft();
+  renderRight();
+}
+
+/* Skalierung: links zeigt die Vorlage mit kL, rechts erwartet sie mit kR = kL * scale */
+function scaleFactors(scale) {
+  const kL = scale > 1 ? 1 / scale : 1;
+  return { kL, kR: kL * scale };
+}
+
+function renderLeft() {
+  const cv = document.getElementById("cvL");
+  const k = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!game.round) return;
+  const st = game.round.settings;
+  const { kL } = scaleFactors(st.scale);
+  const b = bbox(game.round.strokes);
+  /* Vorlage mittig, auf das Raster ausgerichtet, damit Kästchenzählen aufgeht */
+  const cellU = CELL * kL;
+  let ox = U / 2 - (b.x0 + b.w / 2) * kL, oy = U / 2 - (b.y0 + b.h / 2) * kL;
+  ox = Math.round(ox / cellU) * cellU; oy = Math.round(oy / cellU) * cellU;
+  if (st.gridL) drawGrid(ctx, cv.width, cellU * k, [ox * k, oy * k]);
+  const scaled = game.round.strokes.map(s => s.map(p => [p[0] * kL + ox, p[1] * kL + oy]));
+  drawStrokes(ctx, scaled, k, css("--ink"), LINE_W * k);
+  /* Spiegelachse eine Kästchenbreite neben der Figur */
+  const tr = st.transform;
+  if (tr === "mirrorV" || tr === "mirrorH") {
+    const x0 = b.x0 * kL + ox, x1 = b.x1 * kL + ox, y0 = b.y0 * kL + oy, y1 = b.y1 * kL + oy;
+    ctx.save();
+    ctx.strokeStyle = css("--muted"); ctx.lineWidth = Math.max(1.5, k * 0.6);
+    ctx.setLineDash([k * 2.2, k * 1.6]); ctx.lineCap = "round";
+    ctx.beginPath();
+    if (tr === "mirrorV") {
+      const ax = Math.min(U - 2, x1 + cellU);
+      ctx.moveTo(ax * k, Math.max(2, y0 - cellU) * k); ctx.lineTo(ax * k, Math.min(U - 2, y1 + cellU) * k);
+    } else {
+      const ay = Math.min(U - 2, y1 + cellU);
+      ctx.moveTo(Math.max(2, x0 - cellU) * k, ay * k); ctx.lineTo(Math.min(U - 2, x1 + cellU) * k, ay * k);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function renderRight() {
+  const cv = document.getElementById("cvR");
+  const k = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (!game.round) return;
+  const st = game.round.settings;
+  const { kR } = scaleFactors(st.scale);
+  if (st.gridR) drawGrid(ctx, cv.width, CELL * kR * k);
+  const all = game.active ? game.drawn.concat([game.active]) : game.drawn;
+  drawStrokes(ctx, all, k, game.round.color || css("--pen"), LINE_W * k);
+  updateGameButtons();
+}
+
+function updateGameButtons() {
+  const has = game.drawn.length > 0;
+  document.getElementById("btnDone").disabled = !has || game.locked;
+  document.getElementById("btnUndo").disabled = !has || game.locked;
+  document.getElementById("btnClear").disabled = !has || game.locked;
+}
+
+/* --- Zeigereingabe rechts --- */
+function evtPoint(cv, e) {
+  const r = cv.getBoundingClientRect();
+  const x = (e.clientX - r.left) / r.width * U, y = (e.clientY - r.top) / r.height * U;
+  return [Math.max(0, Math.min(U, x)), Math.max(0, Math.min(U, y))];
+}
+function acceptPointer(e) {
+  if (e.pointerType === "pen") game.sawPen = true;
+  if (game.sawPen && e.pointerType === "touch") return false;
+  return e.isPrimary !== false || e.pointerType === "pen";
+}
+
+(function bindDrawing() {
+  const cv = document.getElementById("cvR");
+  cv.addEventListener("pointerdown", e => {
+    if (game.locked || !game.round || game.pointerId !== null || !acceptPointer(e)) return;
+    e.preventDefault();
+    try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    game.pointerId = e.pointerId;
+    game.active = [evtPoint(cv, e)];
+    renderRight();
+  });
+  cv.addEventListener("pointermove", e => {
+    if (e.pointerId !== game.pointerId || !game.active) return;
+    e.preventDefault();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    const k = cv.width / U;
+    const ctx = cv.getContext("2d");
+    for (const ev of (evs.length ? evs : [e])) {
+      const p = evtPoint(cv, ev);
+      const last = game.active[game.active.length - 1];
+      if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.25) continue;
+      /* nur das neue Stück zeichnen statt alles neu */
+      drawStrokes(ctx, [[last, p]], k, game.round.color || css("--pen"), LINE_W * k);
+      game.active.push(p);
+    }
+  });
+  const end = e => {
+    if (e.pointerId !== game.pointerId) return;
+    game.pointerId = null;
+    if (game.active) {
+      let s = game.active;
+      if (game.round && game.round.settings.ruler) s = straighten(s);
+      game.drawn.push(s);
+      game.active = null;
+    }
+    renderRight();
+  };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+  cv.addEventListener("lostpointercapture", end);
+})();
+
+function strokeLength(s) {
+  let l = 0;
+  for (let i = 1; i < s.length; i++) l += Math.hypot(s[i][0] - s[i - 1][0], s[i][1] - s[i - 1][1]);
+  return l;
+}
+
+/* Lineal-Hilfe: nahezu gerade Striche werden zur Strecke */
+function straighten(s) {
+  if (s.length < 3) return s;
+  const a = s[0], b = s[s.length - 1];
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  if (len < 4) return s;
+  let maxDev = 0;
+  for (const p of s) {
+    const d = Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / len;
+    if (d > maxDev) maxDev = d;
+  }
+  return maxDev <= Math.max(1.2, len * 0.07) ? [a, b] : s;
+}
+
+/* -------------------- 7  Spielablauf -------------------- */
+function settingsChips(round) {
+  const st = round.settings, chips = [];
+  if (st.transform && st.transform !== "none") chips.push({ text: t("chip_" + st.transform), rule: true });
+  if (ONE_STROKE.has(round.shapeId)) chips.push({ text: t("chipOneStroke"), rule: true });
+  chips.push({ text: st.view ? t("chipSeconds", { n: st.view }) : t("chipAlways") });
+  if (st.scale === 2) chips.push({ text: t("chipDouble"), rule: true });
+  if (st.scale === 0.5) chips.push({ text: t("chipHalf"), rule: true });
+  chips.push({ text: st.gridL || st.gridR ? t("chipGrid") : t("chipNoGrid") });
+  if (st.ruler) chips.push({ text: t("chipRuler") });
+  return chips;
+}
+function taskText(round) {
+  const st = round.settings, tr = st.transform || "none";
+  let txt;
+  if (tr !== "none") {
+    txt = t("task_" + tr);
+    if (st.scale === 2) txt += " " + t("taskAlsoDouble");
+    if (st.scale === 0.5) txt += " " + t("taskAlsoHalf");
+  } else txt = st.scale === 2 ? t("taskDouble") : st.scale === 0.5 ? t("taskHalf") : t("taskSame");
+  if (ONE_STROKE.has(round.shapeId)) txt += " " + t("taskOneStroke");
+  return txt;
+}
+function renderRoundHead(round) {
+  document.getElementById("gameTask").textContent = taskText(round);
+  const chipsEl = document.getElementById("gameChips");
+  chipsEl.textContent = "";
+  settingsChips(round).forEach(c => {
+    const s = document.createElement("span");
+    s.className = "chip" + (c.rule ? " rule" : ""); s.textContent = c.text;
+    chipsEl.appendChild(s);
+  });
+}
+
+/* Startet eine Runde. round: { shapeId?, strokes, name, settings, mode, title, color? } */
+function startRound(round, onFinish) {
+  game.round = round;
+  game.drawn = []; game.active = null; game.pointerId = null;
+  game.onFinish = onFinish;
+  const st = round.settings;
+  if (!st.transform) st.transform = "none";
+  document.getElementById("gameTitle").textContent = round.title;
+  renderRoundHead(round);
+  const rl = document.getElementById("rightLabel");
+  rl.textContent = round.playerName || t("yourDrawing");
+  rl.style.color = round.color || "";
+  document.getElementById("hiddenCard").hidden = true;
+  document.getElementById("lookVeil").hidden = true;
+  game.locked = false; game.hidden = false;
+  showScreen("game", { noPush: currentScreen === "game" || currentScreen === "handoff" });
+  if (st.view > 0) beginLookPhase(st.view);
+  requestAnimationFrame(layoutGame);
+}
+
+function beginLookPhase(seconds) {
+  game.locked = true;
+  const veil = document.getElementById("lookVeil");
+  const cd = document.getElementById("countdown");
+  const num = document.getElementById("countNum");
+  veil.hidden = false;
+  const t0 = performance.now(), total = seconds * 1000;
+  num.textContent = seconds;
+  cd.style.setProperty("--p", 1);
+  const id = setInterval(() => {
+    const left = Math.max(0, total - (performance.now() - t0));
+    cd.style.setProperty("--p", left / total);
+    num.textContent = Math.ceil(left / 1000);
+    if (left <= 0) endLookPhase();
+  }, 100);
+  timers.add(id);
+  game.lookTimer = id;
+  updateGameButtons();
+}
+function endLookPhase() {
+  if (game.lookTimer) { clearInterval(game.lookTimer); timers.delete(game.lookTimer); game.lookTimer = null; }
+  if (!game.locked) return;
+  game.locked = false; game.hidden = true;
+  document.getElementById("lookVeil").hidden = true;
+  document.getElementById("hiddenCard").hidden = false;
+  updateGameButtons();
+}
+
+function finishDrawing() {
+  if (!game.drawn.length || game.locked || !game.round) return;
+  const st = game.round.settings;
+  const { kR } = scaleFactors(st.scale);
+  const toTarget = tr => transformStrokes(game.round.strokes, tr).map(s => s.map(p => [p[0] * kR, p[1] * kR]));
+  const target = toTarget(st.transform);
+  /* Versehentliche Tupfer (kürzer als eine Einheit) zählen nicht mit,
+     solange es echte Striche gibt. */
+  const real = game.drawn.filter(s => strokeLength(s) >= 1);
+  const drawn = real.length ? real : game.drawn;
+  const res = scoreDrawing(target, drawn);
+  res.drawn = drawn.map(s => s.slice());
+  res.target = target;
+  /* Spiegeln und Drehen: Passt die Zeichnung zu einer falschen Lage
+     besser (etwa einfach abgezeichnet oder falsch herum gedreht), ist die
+     Aufgabe verfehlt – auch wenn die Form an sich stimmt. */
+  if (st.transform && st.transform !== "none") {
+    /* Lagen, die bei symmetrischen Figuren gleich aussehen, scheiden aus.
+       Eine falsche Lage muss klar besser passen, nicht nur zufällig. */
+    const same = JSON.stringify(target);
+    const wrong = WRONG_ORIENTATIONS.filter(tr => tr !== st.transform && JSON.stringify(toTarget(tr)) !== same);
+    const beaten = wrong.some(tr => scoreDrawing(toTarget(tr), drawn).score > res.score + 3);
+    if (beaten) { res.score = Math.min(res.score, 40); res.note = t("wrongOrientation"); }
+  }
+  /* Haus vom Nikolaus: zählt nur in einem Zug */
+  if (ONE_STROKE.has(game.round.shapeId) && real.length > 1) {
+    res.score = Math.min(res.score, 50); res.note = t("oneStrokeFail");
+  }
+  if (game.onFinish) game.onFinish(res);
+}
+
+/* --- Level --- */
+let currentLevel = 0;
+function startLevel(i) {
+  if (i < 0 || i >= LEVELS.length || !isUnlocked(i)) return;
+  if (i >= FREE_LEVELS && !isFull()) { openPaywall("reasonLevels"); return; }
+  currentLevel = i;
+  const L = LEVELS[i];
+  startRound({
+    mode: "level", shapeId: L.shape, strokes: SHAPES[L.shape],
+    title: t("levelN", { n: i + 1 }) + " · " + shapeName(L.shape),
+    settings: { view: L.view, gridL: L.gridL, gridR: L.gridR, scale: L.scale, ruler: L.ruler, transform: L.transform }
+  }, res => {
+    const prog = getProgress();
+    const prevBest = prog[L.id];
+    if (typeof prevBest !== "number" || res.score > prevBest) { prog[L.id] = res.score; store.set("progress", prog); }
+    const passed = starsFor(res.score) >= 1;
+    const actions = [{ label: t("retry"), cls: "", fn: () => startLevel(i) }];
+    if (passed && i + 1 < LEVELS.length) actions.push({ label: t("nextLevel"), cls: "pen", fn: () => startLevel(i + 1) });
+    actions.push({ label: t("allLevels"), cls: "", fn: () => { closeModals(); showScreen("levels"); } });
+    showResult(res, { actions, finalLevel: passed && i + 1 === LEVELS.length });
+  });
+}
+
+/* --- Freies Spiel --- */
+const free = Object.assign({ shape: "house", view: 0, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none" },
+  store.get("free", {}) || {});
+if (!TRANSFORMS[free.transform]) free.transform = "none";
+function pickFreeShape() {
+  if (free.shape !== "random") return resolveShape(free.shape);
+  const all = Object.keys(SHAPES);
+  const id = all[Math.floor(Math.random() * all.length)];
+  return resolveShape(id);
+}
+/* Liefert { strokes, name, id } für eine eingebaute Figur oder eine eigene Vorlage */
+function resolveShape(id) {
+  if (SHAPES[id]) return { id, strokes: SHAPES[id], name: shapeName(id) };
+  const tpl = getTemplates().find(x => x.id === id);
+  if (tpl) return { id, strokes: tpl.strokes, name: tpl.name };
+  return { id: "house", strokes: SHAPES.house, name: shapeName("house") };
+}
+function startFree(overrideShape) {
+  store.set("free", free);
+  const sh = overrideShape || pickFreeShape();
+  startRound({
+    mode: "free", shapeId: sh.id, strokes: sh.strokes, title: sh.name,
+    settings: { view: free.view, gridL: free.gridL, gridR: free.gridR, scale: free.scale, ruler: free.ruler, transform: free.transform }
+  }, res => {
+    showResult(res, { actions: [
+      { label: t("retry"), cls: "", fn: () => startFree(sh) },
+      { label: t("otherShape"), cls: "pen", fn: () => { closeModals(); if (free.shape === "random") startFree(); else showScreen("free", { noPush: true }); } }
+    ]});
+  });
+}
+
+/* --- Ergebnisdialog --- */
+let resultAnim = 0;
+function showResult(res, opts) {
+  const stars = starsFor(res.score);
+  const starsEl = document.getElementById("resStars");
+  starsEl.textContent = "";
+  for (let i = 0; i < 3; i++) {
+    const s = document.createElement("span");
+    s.className = i < stars ? "star-on" : "star-off";
+    s.textContent = "★";
+    starsEl.appendChild(s);
+  }
+  document.getElementById("resVerdict").textContent = opts.finalLevel ? t("allDone") : t("v" + stars);
+  document.getElementById("resPrec").textContent = res.precision + " %";
+  document.getElementById("resRec").textContent = res.recall + " %";
+  document.getElementById("resSize").textContent = res.size + " %";
+  const note = document.getElementById("resNote");
+  note.hidden = !res.note; note.textContent = res.note || "";
+  const act = document.getElementById("resActions");
+  act.textContent = "";
+  opts.actions.forEach(a => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn " + (a.cls || ""); b.textContent = a.label;
+    b.addEventListener("click", () => { closeModals(); a.fn(); });
+    act.appendChild(b);
+  });
+  openModal("mdl-result");
+  drawOverlay(document.getElementById("cvResult"), res, null, true);
+  countUp(document.getElementById("resScore"), res.score);
+  if (stars >= 1) chime(stars);
+}
+
+function countUp(el, target) {
+  cancelAnimationFrame(resultAnim);
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = target + " %"; return; }
+  const t0 = performance.now(), dur = 900;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    el.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))) + " %";
+    if (p < 1) resultAnim = requestAnimationFrame(step);
+  };
+  resultAnim = requestAnimationFrame(step);
+}
+
+/* Überlagerung: Vorlage (Tinte) und Zeichnung, bestmöglich verschoben.
+   penColor gesetzt: Zeichnung einfarbig (Mehrspieler-Podest).
+   penColor null: Zeichnung in Fehlerfarben – trifft, knapp, daneben.
+   animate: erst die eigene Zeichnung, dann blendet die Vorlage wie
+   Pauspapier darüber und die Farben erscheinen. */
+function heatColor(c) { return c >= 0.75 ? "--hit" : c >= 0.4 ? "--near" : "--miss"; }
+function drawHeat(ctx, heat, k, width, alpha) {
+  const col = { "--hit": css("--hit"), "--near": css("--near"), "--miss": css("--miss") };
+  ctx.save();
+  ctx.globalAlpha = alpha; ctx.lineWidth = width; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  for (const s of heat) {
+    if (s.length === 1) {
+      ctx.fillStyle = col[heatColor(s[0][2])];
+      ctx.beginPath(); ctx.arc(s[0][0] * k, s[0][1] * k, width / 2, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
+    /* gleichfarbige Abschnitte am Stück zeichnen, damit keine Nähte entstehen */
+    let i = 1;
+    while (i < s.length) {
+      const key = heatColor((s[i - 1][2] + s[i][2]) / 2);
+      ctx.strokeStyle = col[key];
+      ctx.beginPath(); ctx.moveTo(s[i - 1][0] * k, s[i - 1][1] * k);
+      while (i < s.length && heatColor((s[i - 1][2] + s[i][2]) / 2) === key) { ctx.lineTo(s[i][0] * k, s[i][1] * k); i++; }
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+function drawOverlay(cv, res, penColor, animate) {
+  const k = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  const tgt = res.target.map(s => s.map(p => [p[0] + res.offset[0], p[1] + res.offset[1]]));
+  const b = bbox(tgt.concat(res.drawn));
+  const span = Math.max(b.w, b.h, 8);
+  const sc = (U * 0.86) / span;
+  const mp = p => [(p[0] - b.x0 - b.w / 2) * sc + U / 2, (p[1] - b.y0 - b.h / 2) * sc + U / 2];
+  const T = tgt.map(s => s.map(mp)), D = res.drawn.map(s => s.map(mp));
+  const H = (res.heat || []).map(s => s.map(p => mp(p).concat([p[2]])));
+  const pen = penColor || css("--pen"), ink = css("--ink");
+  const lw = Math.max(2, LINE_W * k * Math.min(1.4, Math.max(0.8, sc)));
+  const useHeat = !penColor && H.length > 0;
+  const paint = p => {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.globalAlpha = useHeat ? 1 - p : 1;
+    drawStrokes(ctx, D, k, pen, lw);
+    ctx.globalAlpha = 1;
+    if (useHeat) drawHeat(ctx, H, k, lw, p);
+    ctx.globalAlpha = (useHeat ? 0.5 : 0.8) * p;
+    drawStrokes(ctx, T, k, ink, lw * (useHeat ? 0.55 : 0.9));
+    ctx.globalAlpha = 1;
+  };
+  if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) { paint(1); return; }
+  const t0 = performance.now() + 250;
+  const step = now => {
+    const p = Math.max(0, Math.min(1, (now - t0) / 700));
+    paint(p);
+    if (p < 1 && !cv.closest("[hidden]")) requestAnimationFrame(step);
+  };
+  paint(0);
+  requestAnimationFrame(step);
+}
+
+/* Kleiner Erfolgston, nur nach Nutzeraktion und wenn eingeschaltet */
+let audioCtx = null;
+function chime(stars) {
+  if (!store.get("sound", true)) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const notes = [523.25, 659.25, 783.99].slice(0, stars);
+    notes.forEach((f, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const t0 = audioCtx.currentTime + i * 0.12;
+      o.type = "sine"; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.18, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(t0); o.stop(t0 + 0.4);
+    });
+  } catch (e) { /* Ton ist Beiwerk */ }
+}
+
+/* -------------------- 8  Bewertung --------------------
+   Beide Linienzüge werden in gleichmäßige Punkte zerlegt. Für jeden
+   Punkt zählt der Abstand zur jeweils anderen Linie (Distanztransformation
+   auf einem Raster mit 0,5 Einheiten). Daraus:
+     precision = Anteil der eigenen Linie, der auf der Vorlage liegt
+     recall    = Anteil der Vorlage, der getroffen wurde
+     score     = harmonisches Mittel beider Werte
+   Für den Formvergleich wird die Zeichnung auf die Größe der Vorlage
+   gebracht und bestmöglich verschoben – die Lage zählt nicht. Die Größe
+   zählt getrennt als Faktor:  score = Form × Größe. */
+/* full:    bis zu dieser Abweichung volle Punkte (Rasterungenauigkeit)
+   sigma:   danach fällt die Wertung weich ab (1,5 Einheiten daneben ≈ 75 %)
+   sizeTol: Größenfaktor exp(-(ln r / sizeTol)²): 10 % zu klein ≈ 91 %,
+            20 % ≈ 67 %, halbe statt doppelte Größe ≈ 0 % */
+const SCORE = { step: 0.5, full: 0.5, sigma: 1.8, sizeTol: 0.35, cell: 0.5, origin: -48, n: 384 };
+
+function resample(strokes, step) {
+  const out = [];
+  for (const s of strokes) {
+    if (!s.length) continue;
+    out.push(s[0]);
+    let carry = 0;
+    for (let i = 1; i < s.length; i++) {
+      const a = s[i - 1], b = s[i];
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (len === 0) continue;
+      let d = step - carry;
+      while (d <= len) {
+        out.push([a[0] + (b[0] - a[0]) * d / len, a[1] + (b[1] - a[1]) * d / len]);
+        d += step;
+      }
+      carry = len - (d - step);
+    }
+    out.push(s[s.length - 1]);
+  }
+  return out;
+}
+
+/* Exakte euklidische Distanztransformation (Felzenszwalb & Huttenlocher) */
+function edt1d(f, n, d, v, z) {
+  let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++;
+    d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+  }
+}
+function distanceField(points) {
+  const N = SCORE.n, INF = 1e12;
+  const g = new Float64Array(N * N).fill(INF);
+  for (const p of points) {
+    const ix = Math.round((p[0] - SCORE.origin) / SCORE.cell), iy = Math.round((p[1] - SCORE.origin) / SCORE.cell);
+    if (ix >= 0 && iy >= 0 && ix < N && iy < N) g[iy * N + ix] = 0;
+  }
+  const f = new Float64Array(N), d = new Float64Array(N), v = new Int32Array(N), z = new Float64Array(N + 1);
+  for (let x = 0; x < N; x++) {
+    for (let y = 0; y < N; y++) f[y] = g[y * N + x];
+    edt1d(f, N, d, v, z);
+    for (let y = 0; y < N; y++) g[y * N + x] = d[y];
+  }
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) f[x] = g[y * N + x];
+    edt1d(f, N, d, v, z);
+    for (let x = 0; x < N; x++) g[y * N + x] = Math.sqrt(d[x]) * SCORE.cell;
+  }
+  return g;
+}
+function lookup(field, x, y) {
+  const ix = Math.round((x - SCORE.origin) / SCORE.cell), iy = Math.round((y - SCORE.origin) / SCORE.cell);
+  if (ix < 0 || iy < 0 || ix >= SCORE.n || iy >= SCORE.n) return 99;
+  return field[iy * SCORE.n + ix];
+}
+function credit(d) { if (d <= SCORE.full) return 1; const x = (d - SCORE.full) / SCORE.sigma; return Math.exp(-x * x); }
+function centroid(pts) {
+  let x = 0, y = 0;
+  for (const p of pts) { x += p[0]; y += p[1]; }
+  return [x / pts.length, y / pts.length];
+}
+
+function scoreDrawing(target, drawn) {
+  const zero = { score: 0, precision: 0, recall: 0, size: 0, offset: [0, 0] };
+  const D0 = resample(drawn, SCORE.step);
+  const E = resample(target, SCORE.step);
+  if (D0.length < 2 || !E.length) return zero;
+  /* Größe: Diagonale des umschließenden Rechtecks */
+  const diag = pts => { const b = bbox([pts]); return Math.hypot(b.w, b.h); };
+  const dD = diag(D0), dE = diag(E);
+  if (dD < 1) return zero;
+  const r = dE > 1 ? Math.min(20, Math.max(0.05, dD / dE)) : 1;
+  const sizeF = dE > 1 ? Math.exp(-Math.pow(Math.log(r) / SCORE.sizeTol, 2)) : 1;
+  /* Form: Zeichnung auf Vorlagengröße bringen, Schwerpunkte übereinander */
+  const cD = centroid(D0), cE = centroid(E);
+  const D = D0.map(p => [cE[0] + (p[0] - cD[0]) / r, cE[1] + (p[1] - cD[1]) / r]);
+  const fieldD = distanceField(D), fieldE = distanceField(E);
+
+  const evalAt = (dx, dy) => {
+    let sp = 0, sr = 0;
+    for (const p of D) sp += credit(lookup(fieldE, p[0] - dx, p[1] - dy));
+    for (const p of E) sr += credit(lookup(fieldD, p[0] + dx, p[1] + dy));
+    const P = sp / D.length, R = sr / E.length;
+    return { P, R, F: P + R > 0 ? 2 * P * R / (P + R) : 0, dx, dy };
+  };
+  let best = evalAt(0, 0);
+  for (let dx = -8; dx <= 8; dx += 2) for (let dy = -8; dy <= 8; dy += 2) {
+    const q = evalAt(dx, dy); if (q.F > best.F) best = q;
+  }
+  const bx = best.dx, by = best.dy;
+  for (let dx = bx - 1.5; dx <= bx + 1.5; dx += 0.5) for (let dy = by - 1.5; dy <= by + 1.5; dy += 0.5) {
+    const q = evalAt(dx, dy); if (q.F > best.F) best = q;
+  }
+  /* Fehlerfarben: jeder Punkt der eigenen Linie, in echten Koordinaten */
+  const heat = drawn.filter(s => s.length).map(s => resample([s], SCORE.step).map(p => {
+    const q = [cE[0] + (p[0] - cD[0]) / r, cE[1] + (p[1] - cD[1]) / r];
+    return [p[0], p[1], credit(lookup(fieldE, q[0] - best.dx, q[1] - best.dy))];
+  }));
+  return {
+    heat,
+    score: Math.round(best.F * sizeF * 100),
+    precision: Math.round(best.P * 100),
+    recall: Math.round(best.R * 100),
+    size: Math.round(sizeF * 100),
+    /* Für die Überlagerung: Vorlage in echter Größe, auf die Zeichnung gelegt */
+    offset: [cD[0] - cE[0] + best.dx * r, cD[1] - cE[1] + best.dy * r]
+  };
+}
+
+/* -------------------- 9  Mehrspieler -------------------- */
+const multi = Object.assign(
+  { count: 2, names: ["", "", "", ""], rounds: 3, pool: "medium", view: 5, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none" },
+  store.get("multi", {}) || {}
+);
+if (!Array.isArray(multi.names) || multi.names.length !== 4) multi.names = ["", "", "", ""];
+if (!TRANSFORMS[multi.transform]) multi.transform = "none";
+if (![2, 3, 4].includes(multi.count)) multi.count = 2;
+let match = null;   // { players:[{name,color}], rounds:[{shape, results:[]}], r, p }
+
+function playerName(i) { return (multi.names[i] || "").trim() || t("playerN", { n: i + 1 }); }
+
+function startMulti() {
+  closeModals();
+  if (multi.count > FREE_PLAYERS && !isFull()) multi.count = FREE_PLAYERS;
+  store.set("multi", multi);
+  let pool = SHAPE_DIFFICULTY[multi.pool] ? SHAPE_DIFFICULTY[multi.pool].slice() : null;
+  if (multi.pool === "own") {
+    const own = getTemplates().map(x => x.id);
+    pool = own.length ? own : SHAPE_DIFFICULTY.medium.slice();
+  }
+  /* Figuren ohne Wiederholung ziehen, solange der Vorrat reicht */
+  const shuffled = pool.slice().sort(() => Math.random() - .5);
+  const rounds = [];
+  for (let r = 0; r < multi.rounds; r++) rounds.push({ shape: shuffled[r % shuffled.length], results: [] });
+  match = {
+    players: Array.from({ length: multi.count }, (_, i) => ({ name: playerName(i), color: PLAYER_COLORS[i] })),
+    rounds, r: 0, p: 0
+  };
+  showHandoff();
+}
+
+function showHandoff() {
+  const pl = match.players[match.p];
+  document.getElementById("handoffRound").textContent = t("roundOf", { r: match.r + 1, n: match.rounds.length });
+  document.getElementById("handoffName").textContent = pl.name;
+  document.getElementById("handoffName").style.color = pl.color;
+  document.getElementById("handoffDot").style.background = pl.color;
+  const isFirstOfAll = match.r === 0 && match.p === 0;
+  document.getElementById("handoffText").textContent =
+    isFirstOfAll ? t("handTo", { name: pl.name }) : t("handNext", { name: pl.name }) + " " + t("handTo", { name: pl.name });
+  showScreen("handoff", { noPush: currentScreen === "game" || currentScreen === "handoff" });
+}
+
+function beginTurn() {
+  const pl = match.players[match.p];
+  const sh = resolveShape(match.rounds[match.r].shape);
+  startRound({
+    mode: "multi", shapeId: sh.id, strokes: sh.strokes, color: pl.color, playerName: pl.name,
+    title: pl.name + " · " + t("roundOf", { r: match.r + 1, n: match.rounds.length }),
+    settings: { view: multi.view, gridL: multi.gridL, gridR: multi.gridR, scale: multi.scale, ruler: multi.ruler, transform: multi.transform }
+  }, res => {
+    match.rounds[match.r].results[match.p] = res;
+    match.p++;
+    if (match.p >= match.players.length) { match.p = 0; match.r++; }
+    if (match.r >= match.rounds.length) showMultiResult();
+    else showHandoff();
+  });
+}
+
+let resultRoundView = -1;  // -1 = Gesamt
+function showMultiResult() {
+  resultRoundView = -1;
+  showScreen("multiResult", { noPush: true });
+  navStack.length = 0;
+  renderMultiResult();
+  chime(3);
+}
+function totals() {
+  return match.players.map((pl, i) => match.rounds.reduce((a, r) => a + (r.results[i] ? r.results[i].score : 0), 0));
+}
+function renderMultiResult() {
+  if (!match) return;
+  const tot = totals();
+  const max = Math.max.apply(null, tot);
+  const winners = match.players.filter((_, i) => tot[i] === max).map(p => p.name);
+  document.getElementById("multiWinner").textContent =
+    winners.length === 1 ? t("winner", { name: winners[0] }) : t("tie", { names: winners.join(" & ") });
+
+  const nav = document.getElementById("roundNav");
+  nav.textContent = "";
+  const mk = (label, idx) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(resultRoundView === idx));
+    if (resultRoundView === idx) b.classList.add("ink");
+    b.addEventListener("click", () => { resultRoundView = idx; renderMultiResult(); });
+    nav.appendChild(b);
+  };
+  mk(t("total"), -1);
+  match.rounds.forEach((r, i) => mk(t("roundShort", { n: i + 1 }) + " · " + resolveShape(r.shape).name, i));
+
+  const view = resultRoundView;
+  const scores = match.players.map((_, i) => view < 0 ? tot[i] : (match.rounds[view].results[i] || { score: 0 }).score);
+  const order = match.players.map((_, i) => i).sort((a, b) => scores[b] - scores[a]);
+  const pod = document.getElementById("podium");
+  pod.textContent = "";
+  const roundForArt = view < 0 ? match.rounds.length - 1 : view;
+  order.forEach(i => {
+    const rank = 1 + scores.filter(s => s > scores[i]).length;
+    const card = document.createElement("div");
+    card.className = "card" + (rank === 1 ? " winner" : "");
+    const rk = document.createElement("div"); rk.className = "rank"; rk.textContent = (rank === 1 ? "👑 " : "") + t("rank", { n: rank });
+    const nm = document.createElement("div"); nm.className = "pname"; nm.textContent = match.players[i].name; nm.style.color = match.players[i].color;
+    const cv = document.createElement("canvas");
+    const sc = document.createElement("div"); sc.className = "pscore";
+    sc.textContent = view < 0 ? String(scores[i]) : scores[i] + " %";
+    card.append(rk, nm, cv, sc);
+    pod.appendChild(card);
+    const res = match.rounds[roundForArt].results[i];
+    if (res) requestAnimationFrame(() => drawOverlay(cv, res, match.players[i].color, false));
+  });
+}
+
+/* -------------------- 10  Vorlagen und Editor -------------------- */
+function getTemplates() {
+  const list = store.get("templates", []);
+  return Array.isArray(list) ? list.filter(validTemplate) : [];
+}
+function saveTemplates(list) {
+  if (!store.set("templates", list)) { toast(t("storageFull")); return false; }
+  return true;
+}
+function validTemplate(x) {
+  return x && typeof x.id === "string" && typeof x.name === "string" && Array.isArray(x.strokes) &&
+    x.strokes.length > 0 && x.strokes.every(s => Array.isArray(s) && s.length >= 1 &&
+      s.every(p => Array.isArray(p) && p.length === 2 && p.every(n => Number.isFinite(n) && n >= 0 && n <= U)));
+}
+function newId() { return "t" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function pointCount(strokes) { return strokes.reduce((a, s) => a + s.length, 0); }
+
+/* Auswahlmodus: mehrere Vorlagen in einem QR-Code teilen */
+let selecting = false;
+const selected = new Set();
+
+function renderTemplates() {
+  const list = getTemplates();
+  const el = document.getElementById("tplList");
+  el.textContent = "";
+  /* Auswahl bereinigen, falls Vorlagen inzwischen gelöscht wurden */
+  for (const id of Array.from(selected)) if (!list.some(x => x.id === id)) selected.delete(id);
+  if (list.length < 2 && selecting) { selecting = false; selected.clear(); }
+  document.getElementById("btnSelect").hidden = list.length < 2 || selecting;
+  document.getElementById("selectBar").hidden = !selecting;
+  document.body.classList.toggle("has-bar", selecting);
+  document.getElementById("selectCount").textContent = selected.size ? t("selectedN", { n: selected.size }) : t("selectSome");
+  document.getElementById("btnShareSel").disabled = selected.size === 0;
+  const newBtn = document.querySelector('[data-action="newTemplate"]');
+  newBtn.classList.toggle("locked", !isFull());
+  if (!list.length) {
+    const e = document.createElement("div");
+    e.className = "empty card"; e.style.gridColumn = "1 / -1";
+    e.innerHTML = '<svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15l3-6 3 4 2-2"/></svg>';
+    const p = document.createElement("p"); p.textContent = t("emptyTemplates");
+    e.appendChild(p); el.appendChild(e);
+    return;
+  }
+  list.forEach(tp => {
+    const cv = document.createElement("canvas");
+    const body = document.createElement("div"); body.className = "tpl-body";
+    const nm = document.createElement("p"); nm.className = "tpl-name"; nm.textContent = tp.name;
+    let card;
+    if (selecting) {
+      card = document.createElement("button"); card.type = "button";
+      card.className = "card tpl selectable";
+      card.setAttribute("aria-pressed", String(selected.has(tp.id)));
+      const ck = document.createElement("span"); ck.className = "check"; ck.textContent = "✓";
+      body.append(nm);
+      card.append(cv, body, ck);
+      card.addEventListener("click", () => {
+        if (selected.has(tp.id)) selected.delete(tp.id); else selected.add(tp.id);
+        renderTemplates();
+      });
+    } else {
+      card = document.createElement("div"); card.className = "card tpl";
+      const acts = document.createElement("div"); acts.className = "tpl-actions";
+      const btn = (icon, label, fn, cls) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "icon-btn" + (cls ? " " + cls : "");
+        b.setAttribute("aria-label", label); b.title = label;
+        b.innerHTML = '<svg class="i" viewBox="0 0 24 24">' + icon + "</svg>";
+        b.addEventListener("click", fn);
+        acts.appendChild(b);
+      };
+      btn('<path d="M7 4v16l13-8z"/>', t("play"), () => startFree({ id: tp.id, strokes: tp.strokes, name: tp.name }));
+      btn('<path d="M4 20l4-1 11-11-3-3L5 16z"/>', t("edit"), () => { if (isFull()) openEditor(tp); else openPaywall("reasonEditor"); });
+      btn('<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><path d="M14 14h2v2h-2zM18 18h2v2h-2zM14 18h2M18 14h2"/>', t("share"), () => openShare([tp]));
+      btn('<path d="M4 7h16M9 7V4h6v3M6.5 7l1 13h9l1-13"/>', t("delete"), () =>
+        confirmBox(t("confirmDelete", { name: tp.name }), t("delete"), () => {
+          saveTemplates(getTemplates().filter(x => x.id !== tp.id));
+          renderTemplates();
+        }), "danger");
+      body.append(nm, acts);
+      card.append(cv, body);
+    }
+    el.appendChild(card);
+    requestAnimationFrame(() => drawThumb(cv, tp.strokes));
+  });
+}
+
+/* --- Editor --- */
+const editor = { id: null, strokes: [], building: null, tool: "line", dirty: false, pointerId: null };
+const SNAP = 4;
+
+function openEditor(tpl) {
+  editor.id = tpl ? tpl.id : null;
+  editor.strokes = tpl ? tpl.strokes.map(s => s.map(p => p.slice())) : [];
+  editor.building = null; editor.dirty = false; editor.pointerId = null;
+  document.getElementById("tplName").value = tpl ? tpl.name : "";
+  setTool("line");
+  showScreen("editor");
+}
+function setTool(tool) {
+  finishBuilding();
+  editor.tool = tool;
+  document.querySelectorAll('[data-action="tool"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.tool === tool)));
+  document.getElementById("btnEndLine").hidden = tool !== "line";
+  updateEditorHint();
+  renderEditor();
+}
+function updateEditorHint() {
+  const n = pointCount(editor.strokes) + (editor.building ? editor.building.length : 0);
+  document.getElementById("editorHint").textContent =
+    (editor.tool === "line" ? t("hintLine") : t("hintFree")) + "  " + t("pointsCount", { n, m: MAX_POINTS });
+  document.getElementById("btnEndLine").disabled = !editor.building || editor.building.length < 2;
+}
+function layoutEditor() {
+  if (currentScreen !== "editor") return;
+  layoutPanels(document.getElementById("editorStage"), [document.getElementById("panelE")]);
+  renderEditor();
+}
+function renderEditor() {
+  const cv = document.getElementById("cvE");
+  const k = fitCanvas(cv);
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  drawGrid(ctx, cv.width, CELL * k);
+  /* Einrastpunkte auf halben Kästchen */
+  ctx.fillStyle = css("--grid-strong");
+  for (let x = 0; x <= U; x += SNAP) for (let y = 0; y <= U; y += SNAP) {
+    ctx.beginPath(); ctx.arc(x * k, y * k, Math.max(1, k * 0.35), 0, Math.PI * 2); ctx.fill();
+  }
+  drawStrokes(ctx, editor.strokes, k, css("--ink"), LINE_W * k);
+  if (editor.building) {
+    drawStrokes(ctx, [editor.building], k, css("--pen"), LINE_W * k);
+    ctx.fillStyle = css("--pen");
+    editor.building.forEach((p, i) => {
+      ctx.beginPath(); ctx.arc(p[0] * k, p[1] * k, (i === 0 ? 2.2 : 1.4) * k, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+}
+function finishBuilding() {
+  if (editor.building) {
+    if (editor.building.length >= 2) editor.strokes.push(editor.building);
+    editor.building = null;
+  }
+}
+function snapPoint(p) {
+  return [Math.max(0, Math.min(U, Math.round(p[0] / SNAP) * SNAP)), Math.max(0, Math.min(U, Math.round(p[1] / SNAP) * SNAP))];
+}
+
+/* Ramer-Douglas-Peucker: vereinfacht Freihand-Linien */
+function simplify(pts, eps) {
+  if (pts.length < 3) return pts.slice();
+  const a = pts[0], b = pts[pts.length - 1];
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+  let idx = -1, maxD = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const p = pts[i];
+    const d = Math.abs((b[0] - a[0]) * (a[1] - p[1]) - (a[0] - p[0]) * (b[1] - a[1])) / len;
+    if (d > maxD) { maxD = d; idx = i; }
+  }
+  if (maxD <= eps) return [a, b];
+  return simplify(pts.slice(0, idx + 1), eps).slice(0, -1).concat(simplify(pts.slice(idx), eps));
+}
+function quantize(stroke) {
+  const out = [];
+  for (const p of stroke) {
+    const q = [Math.max(0, Math.min(U, Math.round(p[0]))), Math.max(0, Math.min(U, Math.round(p[1])))];
+    const last = out[out.length - 1];
+    if (!last || last[0] !== q[0] || last[1] !== q[1]) out.push(q);
+  }
+  return out;
+}
+
+(function bindEditor() {
+  const cv = document.getElementById("cvE");
+  cv.addEventListener("pointerdown", e => {
+    if (editor.pointerId !== null) return;
+    e.preventDefault();
+    const p = evtPoint(cv, e);
+    if (editor.tool === "line") {
+      const s = snapPoint(p);
+      const total = pointCount(editor.strokes) + (editor.building ? editor.building.length : 0);
+      if (total >= MAX_POINTS) { toast(t("tooBig")); return; }
+      if (!editor.building) editor.building = [s];
+      else {
+        const first = editor.building[0], last = editor.building[editor.building.length - 1];
+        if (s[0] === last[0] && s[1] === last[1]) { finishBuilding(); }
+        else if (editor.building.length >= 2 && s[0] === first[0] && s[1] === first[1]) {
+          editor.building.push(s); finishBuilding();
+        } else editor.building.push(s);
+      }
+      editor.dirty = true;
+    } else {
+      try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+      editor.pointerId = e.pointerId;
+      editor.building = [p];
+    }
+    updateEditorHint(); renderEditor();
+  });
+  cv.addEventListener("pointermove", e => {
+    if (editor.tool !== "free" || e.pointerId !== editor.pointerId || !editor.building) return;
+    e.preventDefault();
+    const p = evtPoint(cv, e), last = editor.building[editor.building.length - 1];
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) >= 0.4) { editor.building.push(p); renderEditor(); }
+  });
+  const end = e => {
+    if (editor.tool !== "free" || e.pointerId !== editor.pointerId) return;
+    editor.pointerId = null;
+    if (editor.building) {
+      let s = quantize(simplify(editor.building, 0.9));
+      if (s.length === 1) s = [s[0], s[0].slice()];   // Punkt wird zu kurzem Strich
+      if (pointCount(editor.strokes) + s.length > MAX_POINTS) toast(t("tooBig"));
+      else { editor.strokes.push(s); editor.dirty = true; }
+      editor.building = null;
+    }
+    updateEditorHint(); renderEditor();
+  };
+  cv.addEventListener("pointerup", end);
+  cv.addEventListener("pointercancel", end);
+})();
+
+function editorUndo() {
+  if (editor.building && editor.building.length) {
+    editor.building.pop();
+    if (!editor.building.length) editor.building = null;
+  } else editor.strokes.pop();
+  editor.dirty = true;
+  updateEditorHint(); renderEditor();
+}
+function editorClear() {
+  if (!editor.strokes.length && !editor.building) return;
+  confirmBox(t("discardChanges"), t("clear"), () => {
+    editor.strokes = []; editor.building = null; editor.dirty = true;
+    updateEditorHint(); renderEditor();
+  });
+}
+function editorResult() {
+  finishBuilding();
+  updateEditorHint(); renderEditor();
+  const strokes = editor.strokes.map(quantize).filter(s => s.length >= 1);
+  if (!strokes.length) { toast(t("needStroke")); return null; }
+  if (pointCount(strokes) > MAX_POINTS) { toast(t("tooBig")); return null; }
+  let name = document.getElementById("tplName").value.trim().slice(0, 30);
+  if (!name) name = t("defaultName", { n: getTemplates().length + 1 });
+  return { name, strokes };
+}
+function saveTemplate() {
+  const r = editorResult();
+  if (!r) return;
+  const list = getTemplates();
+  const idx = list.findIndex(x => x.id === editor.id);
+  const tpl = { id: editor.id || newId(), name: r.name, strokes: r.strokes, created: Date.now() };
+  if (idx >= 0) { tpl.created = list[idx].created || tpl.created; list[idx] = tpl; } else list.unshift(tpl);
+  if (!saveTemplates(list)) return;
+  editor.id = tpl.id; editor.dirty = false;
+  document.getElementById("tplName").value = tpl.name;
+  toast(t("saved", { name: tpl.name }));
+  showScreen("templates", { noPush: true });
+  /* Editor nicht im Verlauf lassen, sonst führt Zurück wieder hinein */
+  while (navStack.length && navStack[navStack.length - 1] === "editor") navStack.pop();
+}
+function tryTemplate() {
+  const r = editorResult();
+  if (!r) return;
+  startRound({
+    mode: "free", strokes: r.strokes, title: r.name,
+    settings: { view: 0, gridL: true, gridR: true, scale: 1, ruler: false }
+  }, res => showResult(res, { actions: [
+    { label: t("retry"), cls: "", fn: () => tryTemplate() },
+    { label: t("edit"), cls: "ink", fn: () => { closeModals(); showScreen("editor", { noPush: true }); } }
+  ]}));
+}
+
+/* -------------------- 11  Teilen: Code, Link, QR --------------------
+   Base64url, jede Zahl ein Byte, Punkte im Raum 0..96.
+     v1 (eine Vorlage):     [1] Vorlage [Prüfsumme]
+     v2 (Paket, 2..20):     [2] [Anzahl] Vorlage … [Prüfsumme]
+     Vorlage = [Namenslänge] [Name UTF-8] [Anzahl Striche]
+               je Strich [Anzahl Punkte] dann je Punkt [x][y]
+     Prüfsumme = Summe aller vorigen Bytes mod 256
+   Ein Haus braucht unter 40 Byte. Eine einzelne Vorlage bleibt bei v1,
+   damit Codes aus Version 0.1 weiter funktionieren. */
+const PACK_MAX = 20;
+
+function tplBytes(tpl) {
+  const name = new TextEncoder().encode(tpl.name).slice(0, 60);
+  const out = [name.length, ...name];
+  const strokes = tpl.strokes.filter(s => s.length).slice(0, 255);
+  out.push(strokes.length);
+  for (const s of strokes) {
+    const pts = s.slice(0, 255);
+    out.push(pts.length);
+    for (const p of pts) out.push(Math.max(0, Math.min(U, Math.round(p[0]))), Math.max(0, Math.min(U, Math.round(p[1]))));
+  }
+  return out;
+}
+function encodeShare(list) {
+  const bytes = list.length === 1 ? [1, ...tplBytes(list[0])] : [2, list.length];
+  if (list.length > 1) list.forEach(tp => bytes.push(...tplBytes(tp)));
+  bytes.push(bytes.reduce((a, b) => (a + b) & 255, 0));
+  let bin = "";
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+/* Liest eine Vorlage ab Position i; end = Index der Prüfsumme */
+function readTpl(bytes, i, end) {
+  if (i >= end) return null;
+  const nl = bytes[i++];
+  if (i + nl > end) return null;
+  const name = new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(bytes.slice(i, i + nl)))
+    .replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 30) || "Drawmory";
+  i += nl;
+  if (i >= end) return null;
+  const sc = bytes[i++];
+  if (!sc) return null;
+  const strokes = [];
+  for (let s = 0; s < sc; s++) {
+    if (i >= end) return null;
+    const pc = bytes[i++];
+    if (!pc || i + pc * 2 > end) return null;
+    const st = [];
+    for (let p = 0; p < pc; p++) {
+      const x = bytes[i++], y = bytes[i++];
+      if (x > U || y > U) return null;
+      st.push([x, y]);
+    }
+    strokes.push(st);
+  }
+  if (pointCount(strokes) > MAX_POINTS) return null;
+  return { tpl: { name, strokes }, i };
+}
+/* Liefert eine Liste von Vorlagen oder null */
+function decodeShare(text) {
+  try {
+    let code = String(text || "").trim();
+    const m = code.match(/[#&?]t=([A-Za-z0-9_-]+)/);
+    if (m) code = m[1];
+    if (!/^[A-Za-z0-9_-]{8,6000}$/.test(code)) return null;
+    let b64 = code.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const bytes = Array.from(atob(b64), c => c.charCodeAt(0));
+    if (bytes.length < 6) return null;
+    const end = bytes.length - 1;
+    const sum = bytes.slice(0, end).reduce((a, b) => (a + b) & 255, 0);
+    if (sum !== bytes[end]) return null;
+    const list = [];
+    let i;
+    if (bytes[0] === 1) {
+      const r = readTpl(bytes, 1, end);
+      if (!r) return null;
+      list.push(r.tpl); i = r.i;
+    } else if (bytes[0] === 2) {
+      const n = bytes[1];
+      if (n < 2 || n > PACK_MAX) return null;
+      i = 2;
+      for (let k = 0; k < n; k++) {
+        const r = readTpl(bytes, i, end);
+        if (!r) return null;
+        list.push(r.tpl); i = r.i;
+      }
+    } else return null;
+    if (i !== end) return null;
+    return list;
+  } catch (e) { return null; }
+}
+/* Kurzform für genau eine Vorlage */
+function decodeTemplate(text) { const l = decodeShare(text); return l && l.length === 1 ? l[0] : null; }
+function shareUrl(list) { return SHARE_BASE + "#t=" + encodeShare(list); }
+function sameShape(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+/* Übernimmt Vorlagen, überspringt bereits vorhandene. Gibt die Zahl der neuen zurück. */
+function addImported(items) {
+  const list = getTemplates();
+  const fresh = [];
+  let dup = null, dups = 0;
+  for (const tp of items) {
+    const d = list.concat(fresh).find(x => sameShape(x.strokes, tp.strokes));
+    if (d) { dups++; dup = d; continue; }
+    fresh.push({ id: newId(), name: tp.name, strokes: tp.strokes, created: Date.now() });
+  }
+  if (!fresh.length) {
+    toast(items.length === 1 ? t("importDup", { name: dup.name }) : t("importSomeDup", { n: 0, d: dups }));
+    return 0;
+  }
+  if (!saveTemplates(fresh.reverse().concat(list))) return 0;
+  if (items.length === 1) toast(t("importOk", { name: fresh[0].name }));
+  else toast(dups ? t("importSomeDup", { n: fresh.length, d: dups }) : t("importOkMany", { n: fresh.length }));
+  return fresh.length;
+}
+function doImport() {
+  const items = decodeShare(document.getElementById("importText").value);
+  const msg = document.getElementById("importMsg");
+  if (!items) { msg.textContent = t("importBad"); return; }
+  msg.textContent = "";
+  closeModals();
+  addImported(items);
+  if (currentScreen === "templates") renderTemplates(); else showScreen("templates");
+}
+/* Geteilten Link übernehmen: aus der Adresszeile (Webfassung) oder über
+   drawmory://import#t=… (App). Erst nachfragen, dann übernehmen. */
+function askImport(text, fromWeb) {
+  const items = decodeShare(text);
+  if (!items) { toast(t("importBad")); return false; }
+  const q = items.length === 1 ? t("importAsk", { name: items[0].name })
+    : t("importAskMany", { n: items.length, names: items.map(x => x.name).slice(0, 5).join(", ") + (items.length > 5 ? " …" : "") });
+  /* In der Webfassung auf iPhone und iPad: Angebot, die App zu öffnen */
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const extra = fromWeb && ios ? { label: t("openInApp"), href: "drawmory://import#t=" + encodeShare(items) } : null;
+  confirmBox(q, t("add"), () => { if (addImported(items)) showScreen("templates"); }, extra);
+  return true;
+}
+function checkHashImport() {
+  const h = location.hash || "";
+  if (!/[#&]t=/.test(h)) return false;
+  try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+  askImport(h, !window.cordova);
+  return true;
+}
+/* Aufruf durch cordova-plugin-customurlscheme, wenn ein drawmory://-Link die App öffnet */
+window.handleOpenURL = function (url) {
+  setTimeout(() => { if (/[#&?]t=/.test(String(url))) askImport(url, false); }, 0);
+};
+
+let shareList = null;
+function openShare(list) {
+  let url, qr;
+  try { url = shareUrl(list); qr = QR.encode(url); }
+  catch (e) { toast(t("tooManyForQR")); return; }
+  shareList = list;
+  document.getElementById("shareTitle").textContent = list.length === 1
+    ? t("shareTitle", { name: list[0].name }) : t("shareTitlePack", { n: list.length });
+  document.getElementById("shareCode").textContent = url;
+  const warn = document.getElementById("shareWarn");
+  warn.hidden = qr.version < 15; warn.textContent = t("qrLarge");
+  openModal("mdl-share");
+  renderQR(document.getElementById("cvQR"), qr, Math.max(4, Math.floor(600 / (qr.size + 8))));
+}
+function shareName(list) { return list.length === 1 ? list[0].name : t("packTitle", { n: list.length }); }
+function renderQR(cv, qr, scale) {
+  const quiet = 4, n = qr.size + quiet * 2;
+  cv.width = n * scale; cv.height = n * scale;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "#000";
+  for (let y = 0; y < qr.size; y++) for (let x = 0; x < qr.size; x++)
+    if (qr.get(x, y)) ctx.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+}
+/* QR-Code als Bild mit Vorschau und Namen, etwa für Arbeitsblätter */
+function qrPoster(list) {
+  const qr = QR.encode(shareUrl(list));
+  const W = 900, H = 1180;
+  const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#1A2147"; ctx.textAlign = "center";
+  ctx.font = "800 54px ui-rounded, system-ui, sans-serif";
+  ctx.fillText(shareName(list), W / 2, 90, W - 80);
+  const qc = document.createElement("canvas");
+  const sc = Math.max(2, Math.floor(640 / (qr.size + 8)));
+  renderQR(qc, qr, sc);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(qc, (W - qc.width) / 2, 130);
+  if (list.length > 1) {
+    ctx.font = "600 26px system-ui, sans-serif"; ctx.fillStyle = "#5B6488";
+    ctx.fillText(list.map(x => x.name).join(" · "), W / 2, 130 + qc.height + 44, W - 80);
+  }
+  ctx.font = "700 34px system-ui, sans-serif";
+  ctx.fillStyle = "#2A3BB7"; ctx.fillText("Draw", W / 2 - 50, H - 60);
+  ctx.fillStyle = "#D92A6E"; ctx.fillText("mory", W / 2 + 33, H - 60);
+  ctx.font = "26px system-ui, sans-serif"; ctx.fillStyle = "#5B6488";
+  ctx.fillText(t("tagline"), W / 2, H - 20);
+  return cv.toDataURL("image/png");
+}
+
+/* Teilen: in der App über das Plugin, im Browser über Web Share, sonst Download */
+function shareContent(opts) {
+  const sp = window.plugins && window.plugins.socialsharing;
+  if (window.cordova && sp) {
+    const o = { message: opts.text || "", url: opts.url || undefined, files: opts.dataUrl ? [opts.dataUrl] : [] };
+    /* iPad: das Teilen-Menü braucht einen Ankerpunkt, sonst bricht UIKit ab */
+    if (sp.setIPadPopupCoordinates) sp.setIPadPopupCoordinates(Math.round(innerWidth / 2) + "," + Math.round(innerHeight / 2) + ",1,1");
+    sp.shareWithOptions(o, () => {}, () => {});
+    return;
+  }
+  if (navigator.share) {
+    const data = { title: "Drawmory", text: opts.text };
+    if (opts.url) data.url = opts.url;
+    if (opts.dataUrl) {
+      try {
+        const file = dataUrlToFile(opts.dataUrl, opts.fileName || "drawmory.png");
+        if (navigator.canShare && navigator.canShare({ files: [file] })) data.files = [file];
+      } catch (e) {}
+    }
+    if (!opts.dataUrl || data.files) { navigator.share(data).catch(() => {}); return; }
+  }
+  if (opts.dataUrl) {
+    const a = document.createElement("a");
+    a.href = opts.dataUrl; a.download = opts.fileName || "drawmory.png";
+    document.body.appendChild(a); a.click(); a.remove();
+  } else copyText(opts.url || opts.text);
+}
+function dataUrlToFile(dataUrl, name) {
+  const [head, b64] = dataUrl.split(",");
+  const mime = head.match(/:(.*?);/)[1];
+  const bin = atob(b64), arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new File([arr], name, { type: mime });
+}
+function copyText(text) {
+  const fallback = () => {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) {}
+    ta.remove();
+    toast(ok ? t("copied") : t("copyFailed"));
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(() => toast(t("copied")), fallback);
+  else fallback();
+}
+function safeFileName(name) { return (name.replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "") || "vorlage") + ".png"; }
+
+/* --- QR-Code-Erzeugung (Byte-Modus, Fehlerkorrektur M), ohne Bibliothek ---
+   Nach ISO/IEC 18004. Aufbau angelehnt an Project Nayuki (MIT). */
+const QR = (function () {
+  const ECC_PER_BLOCK_M = [-1, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28];
+  const BLOCKS_M = [-1, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49];
+  const FORMAT_M = 0;   // Formatbits für Stufe M
+
+  function rawModules(ver) {
+    let r = (16 * ver + 128) * ver + 64;
+    if (ver >= 2) {
+      const na = Math.floor(ver / 7) + 2;
+      r -= (25 * na - 10) * na - 55;
+      if (ver >= 7) r -= 36;
+    }
+    return r;
+  }
+  function dataCodewords(ver) { return Math.floor(rawModules(ver) / 8) - ECC_PER_BLOCK_M[ver] * BLOCKS_M[ver]; }
+  function gfMul(x, y) {
+    let z = 0;
+    for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; }
+    return z & 255;
+  }
+  function rsDivisor(deg) {
+    const r = new Array(deg).fill(0); r[deg - 1] = 1;
+    let root = 1;
+    for (let i = 0; i < deg; i++) {
+      for (let j = 0; j < deg; j++) { r[j] = gfMul(r[j], root); if (j + 1 < deg) r[j] ^= r[j + 1]; }
+      root = gfMul(root, 2);
+    }
+    return r;
+  }
+  function rsRemainder(data, div) {
+    const r = div.map(() => 0);
+    for (const b of data) {
+      const f = b ^ r.shift(); r.push(0);
+      div.forEach((c, i) => { r[i] ^= gfMul(c, f); });
+    }
+    return r;
+  }
+  function alignPositions(ver) {
+    if (ver === 1) return [];
+    const n = Math.floor(ver / 7) + 2, size = ver * 4 + 17;
+    const step = ver === 32 ? 26 : Math.ceil((ver * 4 + 4) / (n * 2 - 2)) * 2;
+    const res = [6];
+    for (let pos = size - 7; res.length < n; pos -= step) res.splice(1, 0, pos);
+    return res;
+  }
+
+  function encode(text) {
+    const data = Array.from(new TextEncoder().encode(text));
+    let ver = 1;
+    for (; ver <= 40; ver++) {
+      const ccBits = ver <= 9 ? 8 : 16;
+      if (4 + ccBits + data.length * 8 <= dataCodewords(ver) * 8) break;
+    }
+    if (ver > 40) throw new Error("QR: zu viele Daten");
+    const ccBits = ver <= 9 ? 8 : 16;
+    const bits = [];
+    const put = (val, len) => { for (let i = len - 1; i >= 0; i--) bits.push((val >>> i) & 1); };
+    put(4, 4); put(data.length, ccBits); data.forEach(b => put(b, 8));
+    const cap = dataCodewords(ver) * 8;
+    put(0, Math.min(4, cap - bits.length));
+    put(0, (8 - bits.length % 8) % 8);
+    for (let pad = 0xEC; bits.length < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
+    const cw = [];
+    for (let i = 0; i < bits.length; i += 8) cw.push(bits.slice(i, i + 8).reduce((a, b) => (a << 1) | b, 0));
+
+    /* Blöcke bilden, Fehlerkorrektur anhängen, verschränken */
+    const nb = BLOCKS_M[ver], eccLen = ECC_PER_BLOCK_M[ver];
+    const rawCw = Math.floor(rawModules(ver) / 8);
+    const nShort = nb - rawCw % nb, shortLen = Math.floor(rawCw / nb);
+    const div = rsDivisor(eccLen);
+    const blocks = [];
+    for (let i = 0, k = 0; i < nb; i++) {
+      const dat = cw.slice(k, k + shortLen - eccLen + (i < nShort ? 0 : 1));
+      k += dat.length;
+      const ecc = rsRemainder(dat, div);
+      if (i < nShort) dat.push(0);
+      blocks.push(dat.concat(ecc));
+    }
+    const all = [];
+    for (let i = 0; i < blocks[0].length; i++)
+      blocks.forEach((b, j) => { if (i !== shortLen - eccLen || j >= nShort) all.push(b[i]); });
+
+    /* Matrix */
+    const size = ver * 4 + 17;
+    const mod = Array.from({ length: size }, () => new Array(size).fill(false));
+    const fn = Array.from({ length: size }, () => new Array(size).fill(false));
+    const setF = (x, y, dark) => { mod[y][x] = dark; fn[y][x] = true; };
+    for (let i = 0; i < size; i++) { setF(6, i, i % 2 === 0); setF(i, 6, i % 2 === 0); }
+    const finder = (cx, cy) => {
+      for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy;
+        if (x >= 0 && x < size && y >= 0 && y < size) setF(x, y, d !== 2 && d !== 4);
+      }
+    };
+    finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+    const ap = alignPositions(ver);
+    ap.forEach((a, i) => ap.forEach((b, j) => {
+      if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) return;
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++)
+        setF(a + dx, b + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+    }));
+    const drawFormat = mask => {
+      const d = FORMAT_M << 3 | mask;
+      let rem = d;
+      for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+      const b = (d << 10 | rem) ^ 0x5412;
+      const bit = i => ((b >>> i) & 1) !== 0;
+      for (let i = 0; i <= 5; i++) setF(8, i, bit(i));
+      setF(8, 7, bit(6)); setF(8, 8, bit(7)); setF(7, 8, bit(8));
+      for (let i = 9; i < 15; i++) setF(14 - i, 8, bit(i));
+      for (let i = 0; i < 8; i++) setF(size - 1 - i, 8, bit(i));
+      for (let i = 8; i < 15; i++) setF(8, size - 15 + i, bit(i));
+      setF(8, size - 8, true);
+    };
+    drawFormat(0);
+    if (ver >= 7) {
+      let rem = ver;
+      for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+      const b = ver << 12 | rem;
+      for (let i = 0; i < 18; i++) {
+        const dark = ((b >>> i) & 1) !== 0, a = size - 11 + i % 3, c = Math.floor(i / 3);
+        setF(a, c, dark); setF(c, a, dark);
+      }
+    }
+    /* Daten im Zickzack einlegen */
+    let bi = 0;
+    for (let right = size - 1; right >= 1; right -= 2) {
+      if (right === 6) right = 5;
+      for (let v = 0; v < size; v++) for (let j = 0; j < 2; j++) {
+        const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - v : v;
+        if (!fn[y][x] && bi < all.length * 8) { mod[y][x] = ((all[bi >>> 3] >>> (7 - (bi & 7))) & 1) !== 0; bi++; }
+      }
+    }
+    const maskFn = [
+      (x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0,
+      (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0,
+      (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0
+    ];
+    const applyMask = m => {
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++)
+        if (!fn[y][x] && maskFn[m](x, y)) mod[y][x] = !mod[y][x];
+    };
+    const penalty = () => {
+      let p = 0;
+      for (let pass = 0; pass < 2; pass++) for (let a = 0; a < size; a++) {
+        let run = 1, prev = null;
+        const line = [];
+        for (let b = 0; b < size; b++) {
+          const c = pass ? mod[b][a] : mod[a][b];
+          line.push(c);
+          if (c === prev) { run++; if (run === 5) p += 3; else if (run > 5) p++; }
+          else { run = 1; prev = c; }
+        }
+        const s = line.map(c => (c ? 1 : 0)).join("");
+        const re = /(?=(10111010000|00001011101))/g;
+        while (re.exec(s)) { p += 40; re.lastIndex++; }
+      }
+      let dark = 0;
+      for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+        if (mod[y][x]) dark++;
+        if (x < size - 1 && y < size - 1) {
+          const c = mod[y][x];
+          if (c === mod[y][x + 1] && c === mod[y + 1][x] && c === mod[y + 1][x + 1]) p += 3;
+        }
+      }
+      const total = size * size;
+      p += (Math.ceil(Math.abs(dark * 20 - total * 10) / total) - 1) * 10;
+      return p;
+    };
+    let bestMask = 0, bestP = Infinity;
+    for (let m = 0; m < 8; m++) {
+      applyMask(m); drawFormat(m);
+      const p = penalty();
+      if (p < bestP) { bestP = p; bestMask = m; }
+      applyMask(m);
+    }
+    applyMask(bestMask); drawFormat(bestMask);
+    return { size, version: ver, get: (x, y) => mod[y][x] };
+  }
+  return { encode };
+})();
+
+/* -------------------- 12  Vollversion (In-App-Kauf) --------------------
+   Gratis: Level 1–10, Mehrspieler mit 2 Personen, Import und Spielen
+   geteilter Vorlagen, freies Spiel. Vollversion: alles.
+   Die Sperre gilt nur in der App (window.cordova). Die Webfassung ist die
+   Landeseite der QR-Codes und bleibt vollständig nutzbar.
+   Plugin: cordova-plugin-purchase (CdvPurchase, v13). Ohne Belegprüfung
+   auf einem Server gilt ein Kauf als bestätigt, sobald StoreKit ihn meldet. */
+const PRODUCT_ID = "de.drawmory.app.full";
+const FREE_LEVELS = 10;
+const FREE_PLAYERS = 2;
+const shop = { ready: false, price: "", busy: false, error: "", reason: null };
+
+function inApp() { return !!window.cordova; }
+function isFull() { return !inApp() || store.get("full", false) === true; }
+function setFull() {
+  if (store.get("full", false) === true) return;
+  store.set("full", true);
+  shop.busy = false;
+  if (!document.getElementById("mdl-paywall").hidden) closeModals();
+  toast(t("unlockedToast"));
+  updateProRow();
+  redrawAll();
+  if (currentScreen === "home") renderHome();
+}
+function initShop() {
+  const C = window.CdvPurchase;
+  if (!C || !C.store) return;
+  const st = C.store, P = C.Platform;
+  st.register([{ id: PRODUCT_ID, type: C.ProductType.NON_CONSUMABLE, platform: P.APPLE_APPSTORE }]);
+  st.when()
+    .productUpdated(p => {
+      if (!p || p.id !== PRODUCT_ID) return;
+      shop.price = (p.pricing && p.pricing.price) || shop.price;
+      if (p.owned) setFull();
+      updatePaywall();
+    })
+    .approved(tr => tr.verify())
+    .verified(rc => rc.finish())
+    .finished(tr => {
+      if (tr && tr.products && tr.products.some(x => x.id === PRODUCT_ID)) setFull();
+      shop.busy = false; updatePaywall();
+    });
+  if (st.error) st.error(err => { shop.busy = false; shop.error = (err && err.message) || t("buyFailed"); updatePaywall(); });
+  Promise.resolve(st.initialize([P.APPLE_APPSTORE])).then(() => {
+    shop.ready = true;
+    if (st.owned && st.owned(PRODUCT_ID)) setFull();
+    updatePaywall();
+  }).catch(() => { shop.error = t("buyUnavailable"); updatePaywall(); });
+}
+function openPaywall(reasonKey) {
+  if (isFull()) return;
+  shop.reason = reasonKey; shop.error = "";
+  updatePaywall();
+  openModal("mdl-paywall");
+}
+function updatePaywall() {
+  const r = document.getElementById("payReason");
+  r.hidden = !shop.reason; r.textContent = shop.reason ? t(shop.reason) : "";
+  const buy = document.getElementById("btnBuy");
+  buy.textContent = shop.price ? t("buyFor", { price: shop.price }) : t("buyLoading");
+  buy.disabled = !shop.ready || shop.busy;
+  document.getElementById("btnRestore").disabled = !shop.ready || shop.busy;
+  const m = document.getElementById("payMsg");
+  m.hidden = !shop.error; m.textContent = shop.error;
+}
+function buyFull() {
+  const C = window.CdvPurchase;
+  const p = C && C.store && C.store.get(PRODUCT_ID, C.Platform.APPLE_APPSTORE);
+  const offer = p && p.getOffer && p.getOffer();
+  if (!offer) { shop.error = t("buyUnavailable"); updatePaywall(); return; }
+  shop.busy = true; shop.error = ""; updatePaywall();
+  Promise.resolve(offer.order()).then(err => {
+    if (!err) return;     /* Erfolg meldet .finished() */
+    shop.busy = false;
+    const cancelled = C.ErrorCode && err.code === C.ErrorCode.PAYMENT_CANCELLED;
+    if (!cancelled) shop.error = err.message || t("buyFailed");
+    updatePaywall();
+  }).catch(() => { shop.busy = false; shop.error = t("buyFailed"); updatePaywall(); });
+}
+function restorePurchases() {
+  const C = window.CdvPurchase;
+  if (!C || !C.store) return;
+  shop.busy = true; shop.error = ""; updatePaywall();
+  Promise.resolve(C.store.restorePurchases()).then(() => {
+    shop.busy = false;
+    if (C.store.owned(PRODUCT_ID)) setFull(); else shop.error = t("restoreNone");
+    updatePaywall();
+  }).catch(() => { shop.busy = false; shop.error = t("buyFailed"); updatePaywall(); });
+}
+function updateProRow() {
+  const row = document.getElementById("proRow");
+  row.hidden = !inApp();
+  document.getElementById("proStatus").textContent = isFull() ? t("proActive") : t("proFree");
+  document.getElementById("btnProRow").hidden = isFull();
+}
+document.addEventListener("deviceready", () => {
+  initShop();
+  updateProRow();
+  if (["levels", "templates", "multiSetup"].includes(currentScreen)) showScreen(currentScreen, { noPush: true });
+}, false);
+
+/* -------------------- 13  Einführung -------------------- */
+const INTRO = [
+  { title: "intro1Title", text: "intro1Text", art:
+    '<svg viewBox="0 0 200 104"><rect class="ia-card" x="6" y="6" width="88" height="88" rx="10"/><rect class="ia-card" x="106" y="6" width="88" height="88" rx="10"/>' +
+    '<path class="ia-ink" d="M28 78V50L50 30L72 50V78ZM28 50H72"/><path class="ia-pen" d="M129 77C128.6 68 129.4 58 129 51C136 44 144 37 151 31.5C157 37 164 44 171 50.5"/></svg>' },
+  { title: "intro2Title", text: "intro2Text", art:
+    '<svg viewBox="0 0 200 104"><rect class="ia-card" x="56" y="6" width="88" height="88" rx="10"/>' +
+    '<path class="ia-pen" d="M15 88C14.6 79 15.4 69 15 62C22 55 30 48 37 42.5C43 48 50 55 57 61.5C57.5 70 56.5 80 57 88.5C43 89.5 29 88 15 88Z" opacity=".35"/>' +
+    '<path class="ia-pen" d="M79 80C78.6 71 79.4 61 79 54C86 47 94 40 101 34.5C107 40 114 47 121 53.5C121.5 62 120.5 72 121 80.5C107 81.5 93 80 79 80Z"/>' +
+    '<path class="ia-ink" d="M78 79V53L100 33L122 53V79Z" opacity=".55"/><path class="ia-ink" d="M44 98C58 100 64 96 72 90M66 88L72 90L70 96" style="stroke-width:1.6"/></svg>' },
+  { title: "intro3Title", text: "intro3Text", art:
+    '<svg viewBox="0 0 200 104"><rect class="ia-card" x="56" y="6" width="88" height="88" rx="10"/>' +
+    '<path class="ia-ink" d="M78 79V53L100 33L122 53V79Z" opacity=".45" style="stroke-width:1.4"/>' +
+    '<path class="ia-hit" d="M78.5 79C78 70 78.6 61 78.3 53.5C86 46 93 40 100 33.5C106 39 112 45 117 49.5"/>' +
+    '<path class="ia-near" d="M117 49.5C120 52 123 54.5 124.5 56C124.8 62 124.6 67 124.8 71"/>' +
+    '<path class="ia-miss" d="M124.8 71C125 75 127 80 129 84C118 85 106 81.5 96 82"/><path class="ia-hit" d="M96 82C90 81.5 84 80 78.5 79"/>' +
+    '<text x="158" y="40" font-size="15">78 %</text></svg>' }
+];
+let introStep = 0;
+function openIntro() { introStep = 0; renderIntro(); openModal("mdl-intro"); }
+function renderIntro() {
+  const st = INTRO[introStep];
+  document.getElementById("introArt").innerHTML = st.art;    /* feste, eigene Grafiken */
+  document.getElementById("introTitle").textContent = t(st.title);
+  document.getElementById("introText").textContent = t(st.text);
+  const dots = document.getElementById("introDots");
+  dots.textContent = "";
+  INTRO.forEach((_, i) => { const d = document.createElement("i"); if (i === introStep) d.className = "on"; dots.appendChild(d); });
+  const last = introStep === INTRO.length - 1;
+  document.getElementById("btnIntroNext").textContent = last ? t("start") : t("next");
+  document.getElementById("btnIntroSkip").hidden = last;
+}
+function finishIntro() { store.set("seenIntro", true); closeModals(); }
+
+/* -------------------- 14  Einstellungen, Seiten, Start -------------------- */
+function renderHome() {
+  const prog = getProgress();
+  let s = 0;
+  LEVELS.forEach((_, i) => { const v = bestOf(i); if (v !== null) s += starsFor(v); });
+  document.getElementById("homeProgress").textContent = s ? t("progressStars", { s, t: LEVELS.length * 3 }) : "";
+}
+
+function renderLevels() {
+  const el = document.getElementById("levelList");
+  el.textContent = "";
+  const prog = getProgress();
+  let firstOpen = -1;
+  LEVELS.forEach((_, i) => { if (firstOpen < 0 && isUnlocked(i) && bestOf(i) === null) firstOpen = i; });
+  let idx = 0;
+  WORLDS.forEach(w => {
+    const sec = document.createElement("section"); sec.className = "world";
+    const h = document.createElement("h2"); h.className = "sec"; h.textContent = t(w.key);
+    const sub = document.createElement("p"); sub.className = "sec-sub"; sub.textContent = t(w.key + "Sub");
+    const grid = document.createElement("div"); grid.className = "levels";
+    w.levels.forEach(L => {
+      const i = idx++;
+      const open = isUnlocked(i);
+      const paid = i >= FREE_LEVELS && !isFull();
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "lvl" + (open ? "" : " locked") + (i === firstOpen ? " current" : "");
+      const best = bestOf(i);
+      b.setAttribute("aria-label", t("levelN", { n: i + 1 }) + ", " + shapeName(L.shape) +
+        (open ? (typeof best === "number" ? ", " + best + " %" : "") : ", " + t("locked")));
+      const n = document.createElement("span"); n.className = "lvl-n"; n.textContent = i + 1;
+      const cv = document.createElement("canvas");
+      const st = document.createElement("span"); st.className = "stars";
+      const k = typeof best === "number" ? starsFor(best) : 0;
+      for (let j = 0; j < 3; j++) { const s = document.createElement("span"); s.className = j < k ? "star-on" : "star-off"; s.textContent = "★"; st.appendChild(s); }
+      b.append(n, cv, st);
+      if (paid) { const pb = document.createElement("span"); pb.className = "pro"; pb.textContent = t("proBadge"); b.appendChild(pb); }
+      if (!open) {
+        const lk = document.createElement("span"); lk.className = "lock";
+        lk.innerHTML = '<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>';
+        b.appendChild(lk);
+        b.disabled = true;
+      } else b.addEventListener("click", () => startLevel(i));
+      grid.appendChild(b);
+      requestAnimationFrame(() => drawThumb(cv, SHAPES[L.shape]));
+    });
+    sec.append(h, sub, grid);
+    el.appendChild(sec);
+  });
+}
+
+/* Baustein für Regel-Einstellungen (freies Spiel und Mehrspieler) */
+function renderRules(container, cfg, onChange) {
+  container.textContent = "";
+  const seg = (label, options, key) => {
+    const f = document.createElement("div"); f.className = "field";
+    const l = document.createElement("span"); l.className = "label"; l.textContent = label;
+    const s = document.createElement("div"); s.className = "seg"; s.setAttribute("role", "group");
+    options.forEach(([val, text]) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = text;
+      b.setAttribute("aria-pressed", String(cfg[key] === val));
+      b.addEventListener("click", () => { cfg[key] = val; onChange(); renderRules(container, cfg, onChange); });
+      s.appendChild(b);
+    });
+    f.append(l, s); container.appendChild(f);
+  };
+  const sw = (label, help, key) => {
+    const row = document.createElement("div"); row.className = "switch-row";
+    const l = document.createElement("span"); l.textContent = label;
+    if (help) { const sm = document.createElement("small"); sm.textContent = help; l.appendChild(sm); }
+    const b = document.createElement("button"); b.type = "button"; b.className = "toggle"; b.setAttribute("role", "switch");
+    b.setAttribute("aria-checked", String(!!cfg[key])); b.setAttribute("aria-label", label);
+    b.addEventListener("click", () => { cfg[key] = !cfg[key]; onChange(); renderRules(container, cfg, onChange); });
+    row.append(l, b); container.appendChild(row);
+  };
+  seg(t("viewTime"), [[0, t("always")], [8, t("seconds", { n: 8 })], [5, t("seconds", { n: 5 })], [3, t("seconds", { n: 3 })], [2, t("seconds", { n: 2 })]], "view");
+  seg(t("size"), [[1, t("sizeSame")], [2, t("sizeDouble")], [0.5, t("sizeHalf")]], "scale");
+  seg(t("transform"), [["none", t("trNone")], ["mirrorV", t("trMirrorV")], ["mirrorH", t("trMirrorH")], ["rot90", t("trRot90")], ["rot180", t("trRot180")]], "transform");
+  const box = document.createElement("div"); box.style.marginTop = "6px"; container.appendChild(box);
+  sw(t("gridLeft"), "", "gridL");
+  sw(t("gridRight"), "", "gridR");
+  sw(t("ruler"), t("rulerHelp"), "ruler");
+}
+
+function renderFree() {
+  const pick = document.getElementById("freeShapes");
+  pick.textContent = "";
+  const add = (id, name, strokes) => {
+    const b = document.createElement("button"); b.type = "button";
+    b.setAttribute("aria-pressed", String(free.shape === id));
+    b.setAttribute("aria-label", name);
+    if (strokes) {
+      const cv = document.createElement("canvas"); b.appendChild(cv);
+      requestAnimationFrame(() => drawThumb(cv, strokes));
+    } else { const r = document.createElement("span"); r.className = "rand"; r.textContent = "?"; b.appendChild(r); }
+    const s = document.createElement("span"); s.textContent = name; b.appendChild(s);
+    b.addEventListener("click", () => {
+      free.shape = id; store.set("free", free);
+      pick.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    });
+    pick.appendChild(b);
+  };
+  add("random", t("random"), null);
+  getTemplates().forEach(tp => add(tp.id, tp.name, tp.strokes));
+  Object.keys(SHAPES).forEach(id => add(id, shapeName(id), SHAPES[id]));
+  if (free.shape !== "random" && !SHAPES[free.shape] && !getTemplates().some(x => x.id === free.shape)) free.shape = "house";
+  renderRules(document.getElementById("freeRules"), free, () => store.set("free", free));
+}
+
+function renderMultiSetup() {
+  const pc = document.getElementById("playerCount");
+  pc.textContent = "";
+  if (multi.count > FREE_PLAYERS && !isFull()) multi.count = FREE_PLAYERS;
+  [2, 3, 4].forEach(n => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+    const locked = n > FREE_PLAYERS && !isFull();
+    if (locked) b.classList.add("locked");
+    b.setAttribute("aria-pressed", String(multi.count === n));
+    b.setAttribute("aria-label", n + " " + t("players") + (locked ? ", " + t("fullVersion") : ""));
+    b.addEventListener("click", () => {
+      if (locked) { openPaywall("reasonPlayers"); return; }
+      multi.count = n; store.set("multi", multi); renderMultiSetup();
+    });
+    pc.appendChild(b);
+  });
+  const names = document.getElementById("playerNames");
+  names.textContent = "";
+  for (let i = 0; i < multi.count; i++) {
+    const row = document.createElement("div"); row.className = "player-row";
+    const dot = document.createElement("span"); dot.className = "player-dot"; dot.style.background = PLAYER_COLORS[i];
+    const inp = document.createElement("input"); inp.type = "text"; inp.maxLength = 16;
+    inp.placeholder = t("playerN", { n: i + 1 }); inp.value = multi.names[i] || "";
+    inp.setAttribute("aria-label", t("playerName", { n: i + 1 })); inp.autocomplete = "off";
+    inp.addEventListener("input", () => { multi.names[i] = inp.value; store.set("multi", multi); });
+    row.append(dot, inp); names.appendChild(row);
+  }
+  const rc = document.getElementById("roundCount");
+  rc.textContent = "";
+  [1, 3, 5].forEach(n => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = n;
+    b.setAttribute("aria-pressed", String(multi.rounds === n));
+    b.addEventListener("click", () => { multi.rounds = n; store.set("multi", multi); renderMultiSetup(); });
+    rc.appendChild(b);
+  });
+  const pp = document.getElementById("poolPick");
+  pp.textContent = "";
+  [["easy", t("poolEasy")], ["medium", t("poolMedium")], ["hard", t("poolHard")], ["own", t("poolOwn")]].forEach(([v, l]) => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = l;
+    b.setAttribute("aria-pressed", String(multi.pool === v));
+    b.addEventListener("click", () => {
+      multi.pool = v; store.set("multi", multi); renderMultiSetup();
+      if (v === "own" && !getTemplates().length) toast(t("noOwnTemplates"));
+    });
+    pp.appendChild(b);
+  });
+  renderRules(document.getElementById("multiRules"), multi, () => store.set("multi", multi));
+}
+
+/* --- Sprache --- */
+function setLanguage(l) {
+  lang = I18N[l] ? l : "de";
+  store.set("lang", lang);
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll("[data-i18n-aria]").forEach(el => { el.setAttribute("aria-label", t(el.dataset.i18nAria)); });
+  document.querySelectorAll("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
+  document.querySelectorAll('[data-action="lang"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+  document.getElementById("aboutVersion").textContent = t("version", { v: APP_VERSION });
+  /* sichtbaren Bildschirm in der neuen Sprache neu aufbauen */
+  if (!document.getElementById("mdl-intro").hidden) renderIntro();
+  if (!document.getElementById("mdl-paywall").hidden) updatePaywall();
+  updateProRow();
+  if (currentScreen === "game" && game.round) {
+    renderRoundHead(game.round);
+    if (!game.round.playerName) document.getElementById("rightLabel").textContent = t("yourDrawing");
+  } else if (currentScreen === "editor") updateEditorHint();
+  else if (currentScreen === "multiResult") renderMultiResult();
+  else if (["home", "levels", "free", "multiSetup", "templates"].includes(currentScreen)) showScreen(currentScreen, { noPush: true });
+}
+
+/* --- Darstellung --- */
+function setTheme(mode) {
+  const m = ["auto", "light", "dark"].includes(mode) ? mode : "auto";
+  store.set("theme", m);
+  document.documentElement.setAttribute("data-theme", m);
+  document.querySelectorAll('[data-action="theme"]').forEach(b => b.setAttribute("aria-pressed", String(b.dataset.theme === m)));
+  redrawAll();
+}
+function redrawAll() {
+  if (currentScreen === "game") layoutGame();
+  else if (currentScreen === "editor") layoutEditor();
+  else if (["levels", "free", "templates", "multiSetup", "multiResult"].includes(currentScreen)) {
+    if (currentScreen === "multiResult") renderMultiResult(); else showScreen(currentScreen, { noPush: true });
+  }
+}
+function updateSoundToggle() {
+  document.getElementById("soundToggle").setAttribute("aria-checked", String(!!store.get("sound", true)));
+}
+
+/* Rechtstexte liegen als eigene Seiten neben der App (wie bei FairMix) */
+function openLegal(page) {
+  const file = page + (lang === "en" ? "-en" : "") + ".html";
+  window.location.href = file;
+}
+
+/* --- zentrale Aktionen --- */
+const ACTIONS = {
+  go: b => showScreen(b.dataset.to),
+  back: () => {
+    if (currentScreen === "editor" && editor.dirty) {
+      confirmBox(t("discardChanges"), t("discard"), () => { editor.dirty = false; goBack(); });
+    } else goBack();
+  },
+  home: () => goHome(),
+  lang: b => setLanguage(b.dataset.lang),
+  theme: b => setTheme(b.dataset.theme),
+  toggleSound: () => { store.set("sound", !store.get("sound", true)); updateSoundToggle(); },
+  openSettings: () => { updateSoundToggle(); openModal("mdl-settings"); },
+  openAbout: () => openModal("mdl-about"),
+  legal: b => openLegal(b.dataset.page),
+  closeModal: () => closeModals(),
+  resetProgress: () => confirmBox(t("confirmReset"), t("reset"), () => { store.del("progress"); toast(t("resetDone")); renderHome(); }),
+  startFree: () => startFree(),
+  startMulti: () => startMulti(),
+  beginTurn: () => beginTurn(),
+  quitGame: () => {
+    clearTimers();
+    const wasMulti = !!match;
+    game.round = null; match = null;
+    if (wasMulti) { navStack.length = 0; navStack.push("home"); showScreen("multiSetup", { noPush: true }); }
+    else goBack();
+  },
+  skipLook: () => endLookPhase(),
+  undo: () => { if (game.locked) return; game.drawn.pop(); renderRight(); },
+  clearDrawing: () => { if (game.locked) return; game.drawn = []; renderRight(); },
+  finishDrawing: () => finishDrawing(),
+  newTemplate: () => { if (isFull()) openEditor(null); else openPaywall("reasonEditor"); },
+  selectMode: () => { selecting = true; selected.clear(); renderTemplates(); },
+  selectCancel: () => { selecting = false; selected.clear(); renderTemplates(); },
+  shareSelected: () => {
+    const list = getTemplates().filter(x => selected.has(x.id)).slice(0, PACK_MAX);
+    if (list.length) openShare(list);
+  },
+  openPaywall: () => openPaywall(null),
+  buy: () => buyFull(),
+  restore: () => restorePurchases(),
+  showIntro: () => openIntro(),
+  introNext: () => { if (introStep < INTRO.length - 1) { introStep++; renderIntro(); } else finishIntro(); },
+  introSkip: () => finishIntro(),
+  openImport: () => { document.getElementById("importText").value = ""; document.getElementById("importMsg").textContent = ""; openModal("mdl-import"); },
+  doImport: () => doImport(),
+  tool: b => setTool(b.dataset.tool),
+  endLine: () => { finishBuilding(); updateEditorHint(); renderEditor(); },
+  editorUndo: () => editorUndo(),
+  editorClear: () => editorClear(),
+  saveTemplate: () => saveTemplate(),
+  tryTemplate: () => tryTemplate(),
+  shareQR: () => { if (shareList) shareContent({ text: t("shareText", { name: shareName(shareList) }), dataUrl: qrPoster(shareList), fileName: safeFileName(shareName(shareList)) }); },
+  shareLink: () => { if (shareList) shareContent({ text: t("shareText", { name: shareName(shareList) }), url: shareUrl(shareList) }); },
+  copyLink: () => { if (shareList) copyText(shareUrl(shareList)); },
+  confirmYes: () => { const fn = confirmHandler; confirmHandler = null; closeModals(); if (fn) fn(); },
+  confirmNo: () => { confirmHandler = null; closeModals(); },
+  applyUpdate: () => applyUpdate()
+};
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-action]");
+  if (!b || b.disabled) return;
+  const fn = ACTIONS[b.dataset.action];
+  if (fn) fn(b);
+});
+/* Klick auf den Hintergrund schließt Dialoge – außer dem Ergebnis, das soll niemand wegtippen */
+document.querySelectorAll(".modal").forEach(m => m.addEventListener("click", e => {
+  if (e.target === m && m.id !== "mdl-result") { if (m.id === "mdl-confirm") confirmHandler = null; closeModals(); }
+}));
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    const open = Array.from(document.querySelectorAll(".modal")).find(m => !m.hidden);
+    if (open && open.id !== "mdl-result") { confirmHandler = null; closeModals(); }
+  }
+  if (e.key === "Enter" && !document.getElementById("mdl-import").hidden && (e.metaKey || e.ctrlKey)) doImport();
+});
+
+let resizeRaf = 0;
+window.addEventListener("resize", () => {
+  cancelAnimationFrame(resizeRaf);
+  resizeRaf = requestAnimationFrame(() => { if (currentScreen === "game") layoutGame(); else if (currentScreen === "editor") layoutEditor(); });
+});
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (store.get("theme", "auto") === "auto") redrawAll(); });
+window.addEventListener("hashchange", checkHashImport);
+/* Pinch-Zoom auf dem iPad unterbinden, er stört beim Zeichnen */
+document.addEventListener("gesturestart", e => e.preventDefault());
+
+/* --- Service Worker (nur Webfassung, nicht in der App-Hülle) --- */
+let swRegistration = null, swReloading = false;
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || window.cordova) return;
+  if (location.protocol !== "https:" && location.hostname !== "localhost") return;
+  navigator.serviceWorker.register("./sw.js").then(reg => {
+    swRegistration = reg;
+    if (reg.waiting) showUpdateToast();
+    reg.addEventListener("updatefound", () => {
+      const fresh = reg.installing;
+      if (!fresh) return;
+      fresh.addEventListener("statechange", () => {
+        if (fresh.state === "installed" && navigator.serviceWorker.controller) showUpdateToast();
+      });
+    });
+  }).catch(() => {});
+  /* Neu laden nur nach Tippen auf „Aktualisieren“. Beim allerersten Besuch
+     übernimmt der Worker die Seite ebenfalls (clients.claim) – ein Neuladen
+     dort würfe eine gerade per Link geöffnete Vorlage samt Rückfrage weg. */
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!swUpdateRequested || swReloading) return;
+    swReloading = true; window.location.reload();
+  });
+}
+let swUpdateRequested = false;
+function showUpdateToast() { document.getElementById("updateToast").classList.add("show"); }
+function applyUpdate() {
+  document.getElementById("updateToast").classList.remove("show");
+  swUpdateRequested = true;
+  if (swRegistration && swRegistration.waiting) swRegistration.waiting.postMessage({ type: "SKIP_WAITING" });
+  else window.location.reload();
+}
+
+/* --- Start --- */
+(function init() {
+  const saved = store.get("lang", null);
+  const guess = (navigator.language || "de").toLowerCase().startsWith("de") ? "de" : "en";
+  setTheme(store.get("theme", "auto"));
+  setLanguage(saved || guess);
+  updateSoundToggle();
+  updateProRow();
+  showScreen("home", { noPush: true });
+  const importing = checkHashImport();
+  if (!importing && !store.get("seenIntro", false)) openIntro();
+  registerServiceWorker();
+})();
+</script>
+<script src="cordova.js"></script>
+</body>
+</html>

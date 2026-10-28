@@ -1,0 +1,90 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Paketkennung: nach der ersten Veröffentlichung unveränderlich.
+     Vor dem Anlegen in App Store Connect bewusst festlegen. -->
+<widget id="de.drawmory.app"
+        version="0.2.0"
+        android-versionCode="200"
+        ios-CFBundleVersion="200"
+        xmlns="http://www.w3.org/ns/widgets"
+        xmlns:cdv="http://cordova.apache.org/ns/1.0">
+
+    <name>Drawmory</name>
+    <description>Figuren anschauen, merken und nachzeichnen. Mit Leveln, Maßstab-Aufgaben, Mehrspieler und eigenen Vorlagen. Läuft vollständig offline.</description>
+    <author email="smaehlmann.appdev@gmail.com">Wisdompeak Apps – Simon Mählmann</author>
+
+    <content src="index.html" />
+
+    <!-- Wie bei FairMix: kein <access origin="*">, die App lädt keine fremden
+         Inhalte. Externe Links (GitHub-Datenschutz) gehen an Safari. -->
+    <allow-intent href="mailto:*" />
+    <allow-intent href="https://*/*" />
+
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="Fullscreen" value="false" />
+    <!-- Beide Lagen: quer stehen Vorlage und Zeichnung nebeneinander,
+         hochkant übereinander. -->
+    <preference name="Orientation" value="default" />
+    <preference name="BackgroundColor" value="0xfff5f8fc" />
+
+    <platform name="ios">
+        <preference name="deployment-target" value="15.0" />
+        <preference name="AllowBackForwardNavigationGestures" value="true" />
+        <!-- Heller Kopfbereich: dunkle Statusleiste -->
+        <preference name="StatusBarOverlaysWebView" value="true" />
+        <preference name="StatusBarStyle" value="default" />
+        <preference name="AllowInlineMediaPlayback" value="true" />
+        <preference name="MediaTypesRequiringUserActionForPlayback" value="none" />
+        <!-- Kein Bounce, kein Text-Lupe-Effekt beim Zeichnen mit dem Finger -->
+        <preference name="SuppressesLongPressGesture" value="true" />
+
+        <edit-config target="ITSAppUsesNonExemptEncryption" file="*-Info.plist" mode="overwrite">
+            <false/>
+        </edit-config>
+        <edit-config target="NSPhotoLibraryAddUsageDescription" file="*-Info.plist" mode="overwrite">
+            <string>Drawmory speichert auf deinen Wunsch das Bild eines QR-Codes in deiner Fotomediathek. Es werden keine vorhandenen Fotos gelesen.</string>
+        </edit-config>
+        <edit-config target="NSPhotoLibraryUsageDescription" file="*-Info.plist" mode="overwrite">
+            <string>Drawmory speichert auf deinen Wunsch das Bild eines QR-Codes in deiner Fotomediathek. Vorhandene Fotos werden weder gelesen noch verändert.</string>
+        </edit-config>
+
+        <icon src="res/ios/icon-20.png"   width="20"   height="20" />
+        <icon src="res/ios/icon-29.png"   width="29"   height="29" />
+        <icon src="res/ios/icon-40.png"   width="40"   height="40" />
+        <icon src="res/ios/icon-58.png"   width="58"   height="58" />
+        <icon src="res/ios/icon-60.png"   width="60"   height="60" />
+        <icon src="res/ios/icon-76.png"   width="76"   height="76" />
+        <icon src="res/ios/icon-80.png"   width="80"   height="80" />
+        <icon src="res/ios/icon-87.png"   width="87"   height="87" />
+        <icon src="res/ios/icon-120.png"  width="120"  height="120" />
+        <icon src="res/ios/icon-152.png"  width="152"  height="152" />
+        <icon src="res/ios/icon-167.png"  width="167"  height="167" />
+        <icon src="res/ios/icon-180.png"  width="180"  height="180" />
+        <icon src="res/ios/icon-1024.png" width="1024" height="1024" />
+        <splash src="res/ios/Default@2x~universal~anyany.png" />
+    </platform>
+
+    <platform name="android">
+        <preference name="android-minSdkVersion"     value="24" />
+        <preference name="android-targetSdkVersion"  value="36" />
+        <preference name="android-compileSdkVersion" value="36" />
+        <preference name="AndroidXEnabled" value="true" />
+        <preference name="AndroidWindowSplashScreenBackground" value="#F5F8FC" />
+        <icon src="icon.png" />
+    </platform>
+
+    <!-- QR-Bild und Link teilen. Auf dem iPad ist das Menü ein Popover –
+         shareContent() übergibt dafür iPadPopupCoordinates. -->
+    <plugin name="cordova-plugin-x-socialsharing" spec="^6.0.4" />
+    <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
+
+    <!-- Vollversion als einmaliger In-App-Kauf (StoreKit). Produkt in
+         App Store Connect anlegen: Typ "Nicht-Verbrauchsartikel",
+         Produkt-ID de.drawmory.app.full (= PRODUCT_ID in index.html). -->
+    <plugin name="cordova-plugin-purchase" spec="^13.10.0" />
+
+    <!-- drawmory://import#t=… öffnet die App und übernimmt Vorlagen.
+         Die Webfassung bietet diesen Link nach dem Scannen eines QR-Codes an. -->
+    <plugin name="cordova-plugin-customurlscheme" spec="^5.0.2">
+        <variable name="URL_SCHEME" value="drawmory" />
+    </plugin>
+</widget>

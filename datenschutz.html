@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Datenschutzerklärung – Drawmory</title>
+<meta name="theme-color" content="#F5F8FC">
+<style>
+  :root { --paper:#F5F8FC; --grid:#DFE7F2; --card:#fff; --text:#1A2147; --muted:#5B6488; --ink:#2A3BB7; --pen:#D92A6E; --line:#D5DCEB; }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper:#131932; --grid:#1C2447; --card:#1B2243; --text:#EEF0FA; --muted:#A3AAC8; --ink:#8D9DFF; --pen:#FF5C9D; --line:#2E3866; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:calc(24px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+    background-color:var(--paper); color:var(--text);
+    background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:24px 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; line-height:1.6;
+  }
+  main { max-width:760px; margin:0 auto; background:var(--card); border:2px solid var(--line); border-radius:24px; padding:24px; }
+  h1 { font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; font-size:clamp(26px,5vw,34px); margin:0 0 4px; }
+  h2 { font-size:clamp(18px,4vw,21px); margin:30px 0 8px; }
+  .stand { color:var(--muted); font-size:14px; margin:0 0 24px; }
+  address { font-style:normal; }
+  a { color:var(--ink); }
+  .links { margin-top:32px; display:flex; flex-wrap:wrap; gap:10px; }
+  .links a { display:inline-block; padding:12px 20px; border-radius:999px; text-decoration:none; font-weight:700;
+             border:2px solid var(--line); color:var(--text); background:var(--card); }
+  .links a.back { background:var(--ink); border-color:var(--ink); color:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Datenschutzerklärung</h1>
+  <p class="stand">Drawmory · Stand: Oktober 2026</p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>Verantwortlich im Sinne von Art. 4 Nr. 7 DSGVO ist:</p>
+  <address>
+    Wisdompeak Apps<br>
+    Inhaber: Simon Mählmann<br>
+    Oderstraße 13<br>
+    28844 Weyhe<br>
+    Deutschland<br>
+    E-Mail: <a href="mailto:smaehlmann.appdev@gmail.com">smaehlmann.appdev@gmail.com</a>
+  </address>
+  <p>Ein Datenschutzbeauftragter ist nicht bestellt, da die Voraussetzungen des Art. 37 DSGVO und des § 38 BDSG nicht vorliegen.</p>
+
+  <h2>2. Grundsatz: keine Datenerhebung</h2>
+  <p>Drawmory verarbeitet keine personenbezogenen Daten auf Servern des Anbieters. Die App arbeitet vollständig offline. Es gibt keine Benutzerkonten, keine Registrierung, keine Analyse- oder Trackingdienste, keine Werbung und keine Weitergabe von Daten an Dritte.</p>
+
+  <h2>3. Welche Daten auf dem Gerät gespeichert werden</h2>
+  <p>Folgende Angaben werden ausschließlich im lokalen Speicher des Geräts abgelegt:</p>
+  <ul>
+    <li>Ihre besten Ergebnisse in den Leveln</li>
+    <li>die von Ihnen gezeichneten oder importierten Vorlagen</li>
+    <li>die im Mehrspieler-Modus eingegebenen Namen, damit sie beim nächsten Spiel vorausgefüllt sind</li>
+    <li>Ihre Einstellungen zu Sprache, Darstellung, Tönen und Spielregeln</li>
+  </ul>
+  <p>Ihre Zeichnungen selbst werden nicht gespeichert. Sie werden nur für die Bewertung der jeweiligen Runde verwendet und danach verworfen.</p>
+  <p>Die Daten liegen über die Browser-Technik <em>localStorage</em> im geschützten App-Verzeichnis. Sie werden zu keinem Zeitpunkt übertragen und beim Deinstallieren der App vollständig entfernt. Innerhalb der App lassen sich Vorlagen einzeln löschen und die Level-Ergebnisse unter „Einstellungen → Fortschritt zurücksetzen“ entfernen.</p>
+
+  <h2>4. Hinweis zu Namen im Mehrspieler-Modus</h2>
+  <p>Wenn Sie im Mehrspieler-Modus Namen von Schülerinnen und Schülern eingeben, verarbeiten Sie personenbezogene Daten in eigener Verantwortung. Die Namen verlassen das Gerät nicht. Es empfiehlt sich trotzdem, nur Vornamen oder Spitznamen zu verwenden. Ohne Eingabe spielt die App mit „Spieler 1“, „Spieler 2“ usw.</p>
+
+  <h2>5. Teilen von Vorlagen per Link und QR-Code</h2>
+  <p>Eine Vorlage kann als Link oder QR-Code weitergegeben werden. Der Link enthält den Namen der Vorlage und ihre Linien als Code. Dieser Code steht hinter dem Zeichen „#“ und wird beim Öffnen des Links technisch nicht an den Webserver übertragen, sondern nur auf dem empfangenden Gerät ausgewertet. Der QR-Code wird auf Ihrem Gerät erzeugt. Wohin Sie Link oder Bild über die Teilen-Funktion Ihres Geräts weitergeben, entscheiden allein Sie.</p>
+
+  <h2>6. Webfassung und Hosting</h2>
+  <p>Wer einen geteilten Link ohne installierte App öffnet, erreicht die Webfassung von Drawmory. Sie wird über GitHub Pages bereitgestellt, einen Dienst der GitHub Inc., 88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, USA. Beim Abruf verarbeitet GitHub technisch notwendige Verbindungsdaten wie die IP-Adresse, um die Seite auszuliefern und den Dienst abzusichern. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt in der zuverlässigen Bereitstellung der Webfassung. GitHub ist nach dem EU-US Data Privacy Framework zertifiziert. Einzelheiten: <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>. Nach dem ersten Laden arbeitet auch die Webfassung offline; Inhalte, Ergebnisse und Vorlagen werden nicht an GitHub übertragen.</p>
+
+  <h2>7. Berechtigungen</h2>
+  <p>Die App fordert keine Berechtigungen für Kamera, Mikrofon, Kontakte oder Standort an. Zum Scannen eines QR-Codes nutzen Sie die Kamera-App Ihres Geräts, nicht Drawmory. Beim Teilen eines QR-Code-Bildes wird die Datei in einem temporären App-Verzeichnis abgelegt und über die Teilen-Funktion Ihres Geräts weitergegeben. Wählen Sie dort „Bild sichern“, fragt Ihr Gerät nach der Erlaubnis, ein Bild in der Fotomediathek abzulegen; vorhandene Fotos werden nicht gelesen.</p>
+
+  <h2>8. Verbindungen ins Internet</h2>
+  <p>Die App baut von sich aus keine Netzwerkverbindungen auf. Sie enthält keine externen Bibliotheken, keine Schriftarten von Fremdservern und keine eingebetteten Inhalte.</p>
+
+  <h2>9. Bezug über einen App-Vertrieb</h2>
+  <p>Beim Herunterladen der App über einen App-Vertrieb verarbeitet dessen Betreiber eigenständig Daten (etwa Konto, Gerät und Zeitpunkt des Downloads). Darauf hat der Anbieter dieser App keinen Einfluss. Es gelten die Datenschutzbestimmungen des jeweiligen Betreibers.</p>
+
+  <h2>10. Kauf der Vollversion</h2>
+  <p>Die Vollversion wird als einmaliger In-App-Kauf über den App Store von Apple abgewickelt. Zahlungs- und Kontodaten verarbeitet ausschließlich Apple; der Anbieter erhält davon keine Kenntnis. Die App erfährt über die Schnittstelle von Apple (StoreKit) nur, ob der Kauf besteht, und merkt sich das im lokalen Speicher. Es gelten die Datenschutzbestimmungen von Apple.</p>
+
+  <h2>11. Öffnen geteilter Links in der App</h2>
+  <p>Die App kann Links der Form <em>drawmory://import#…</em> empfangen, um eine geteilte Vorlage zu übernehmen. Der Link enthält nur Namen und Linien der Vorlage. Übernommen wird erst nach Ihrer Bestätigung.</p>
+
+  <h2>12. Ihre Rechte</h2>
+  <p>Ihnen stehen die Rechte auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch nach Art. 15 bis 21 DSGVO zu sowie ein Beschwerderecht bei einer Aufsichtsbehörde. Da beim Anbieter keine personenbezogenen Daten gespeichert werden, laufen Auskunfts- und Löschersuchen gegenüber dem Anbieter in der Regel ins Leere. Sie können alle Daten jederzeit selbst in der App löschen.</p>
+
+  <h2>13. Änderungen dieser Erklärung</h2>
+  <p>Diese Erklärung wird angepasst, sobald sich Funktionen der App ändern, die für den Datenschutz erheblich sind. Die jeweils gültige Fassung ist in der App abrufbar.</p>
+
+  <h2>14. Kontakt</h2>
+  <p>Bei Fragen zum Datenschutz wenden Sie sich bitte an <a href="mailto:smaehlmann.appdev@gmail.com">smaehlmann.appdev@gmail.com</a>.</p>
+  <div class="links">
+    <a class="back" href="index.html">Zurück zur App</a>
+    <a href="impressum.html">Impressum</a>
+    <a href="datenschutz-en.html">English</a>
+  </div>
+</main>
+</body>
+</html>

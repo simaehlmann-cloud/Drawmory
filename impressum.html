@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Impressum – Drawmory</title>
+<meta name="theme-color" content="#F5F8FC">
+<style>
+  :root { --paper:#F5F8FC; --grid:#DFE7F2; --card:#fff; --text:#1A2147; --muted:#5B6488; --ink:#2A3BB7; --pen:#D92A6E; --line:#D5DCEB; }
+  @media (prefers-color-scheme: dark) {
+    :root { --paper:#131932; --grid:#1C2447; --card:#1B2243; --text:#EEF0FA; --muted:#A3AAC8; --ink:#8D9DFF; --pen:#FF5C9D; --line:#2E3866; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; padding:calc(24px + env(safe-area-inset-top)) 16px calc(40px + env(safe-area-inset-bottom));
+    background-color:var(--paper); color:var(--text);
+    background-image:linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size:24px 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; line-height:1.6;
+  }
+  main { max-width:760px; margin:0 auto; background:var(--card); border:2px solid var(--line); border-radius:24px; padding:24px; }
+  h1 { font-family: ui-rounded, "SF Pro Rounded", system-ui, sans-serif; font-size:clamp(26px,5vw,34px); margin:0 0 4px; }
+  h2 { font-size:clamp(18px,4vw,21px); margin:30px 0 8px; }
+  .stand { color:var(--muted); font-size:14px; margin:0 0 24px; }
+  address { font-style:normal; }
+  a { color:var(--ink); }
+  .links { margin-top:32px; display:flex; flex-wrap:wrap; gap:10px; }
+  .links a { display:inline-block; padding:12px 20px; border-radius:999px; text-decoration:none; font-weight:700;
+             border:2px solid var(--line); color:var(--text); background:var(--card); }
+  .links a.back { background:var(--ink); border-color:var(--ink); color:#fff; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Impressum</h1>
+  <p class="stand">Drawmory · Stand: Oktober 2026</p>
+
+  <h2>Angaben gemäß § 5 DDG</h2>
+  <address>
+    Wisdompeak Apps<br>
+    Inhaber: Simon Mählmann<br>
+    Oderstraße 13<br>
+    28844 Weyhe<br>
+    Deutschland
+  </address>
+
+  <h2>Kontakt</h2>
+  <p>E-Mail: <a href="mailto:smaehlmann.appdev@gmail.com">smaehlmann.appdev@gmail.com</a></p>
+
+  <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
+  <p>Simon Mählmann, Anschrift wie oben.</p>
+
+  <h2>Umsatzsteuer</h2>
+  <p>Umsatzsteuer-Identifikationsnummer gemäß § 27 a UStG: DE430437820</p>
+  <p>Kleinunternehmer gemäß § 19 UStG. Es wird keine Umsatzsteuer ausgewiesen und kein Vorsteuerabzug geltend gemacht.</p>
+
+  <h2>Verbraucherstreitbeilegung</h2>
+  <p>Wir sind nicht bereit und nicht verpflichtet, an Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+
+  <h2>Haftung für Inhalte</h2>
+  <p>Die Inhalte dieser App wurden mit Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.</p>
+
+  <h2>Von Nutzerinnen und Nutzern erstellte Vorlagen</h2>
+  <p>Eigene Vorlagen entstehen und bleiben auf dem Gerät der Person, die sie zeichnet. Werden sie per Link oder QR-Code weitergegeben, geschieht das direkt zwischen den Beteiligten und ohne Server des Anbieters. Für den Inhalt geteilter Vorlagen ist die jeweils teilende Person verantwortlich.</p>
+
+  <h2>Haftung für Links</h2>
+  <p>Die App und die Datenschutzerklärung enthalten vereinzelt Verweise auf externe Websites Dritter, auf deren Inhalte kein Einfluss besteht. Für diese Inhalte ist stets der jeweilige Anbieter verantwortlich. Zum Zeitpunkt der Verlinkung waren keine Rechtsverstöße erkennbar. Bei Bekanntwerden von Rechtsverletzungen werden entsprechende Links umgehend entfernt.</p>
+
+  <h2>Urheberrecht</h2>
+  <p>Die durch den Anbieter erstellten Inhalte und Werke in dieser App, einschließlich der mitgelieferten Figuren und Level, unterliegen dem deutschen Urheberrecht. Von Nutzerinnen und Nutzern gezeichnete Vorlagen sind davon nicht berührt.</p>
+  <div class="links">
+    <a class="back" href="index.html">Zurück zur App</a>
+    <a href="datenschutz.html">Datenschutzerklärung</a>
+    <a href="impressum-en.html">English</a>
+  </div>
+</main>
+</body>
+</html>
