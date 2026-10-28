@@ -263,6 +263,16 @@ p.sec-sub { color: var(--muted); margin: 0 0 12px; }
   background: var(--paper); border: 2px solid currentColor;
 }
 .panel.left .panel-label { color: var(--ink); }
+/* Zeichenzeit: läuft ab dem ersten Strich, Balken leert sich nach links */
+.draw-timer {
+  position: absolute; top: -2px; right: 14px; transform: translateY(-50%); z-index: 2;
+  min-width: 74px; padding: 2px 12px; border-radius: 999px; text-align: center;
+  font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--marker-text); border: 2px solid var(--marker);
+  background: linear-gradient(90deg, var(--marker) calc(var(--p, 1) * 100%), var(--paper) 0);
+}
+.draw-timer.urgent { border-color: var(--danger); background: linear-gradient(90deg, var(--danger) calc(var(--p, 1) * 100%), var(--paper) 0); color: #fff; }
+.draw-timer.waiting { background: var(--paper); color: var(--text); }
 .panel.right .panel-label { color: var(--pen); }
 .panel canvas {
   display: block; width: 100%; height: 100%;
@@ -509,7 +519,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
             <span class="mm-icon"><svg class="i" viewBox="0 0 24 24"><path d="M7 4v16l13-8z"/></svg></span>
             <span>
               <strong data-i18n="playLevels">Level spielen</strong>
-              <span data-i18n="playLevelsSub">30 Level in 5 Welten</span>
+              <span id="levelsSub"></span>
               <span class="progress-line" id="homeProgress"></span>
             </span>
           </button>
@@ -623,6 +633,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
       </div>
       <div class="panel right" id="panelR">
         <span class="panel-label" id="rightLabel" data-i18n="yourDrawing">Deine Zeichnung</span>
+        <span class="draw-timer" id="drawTimer" hidden></span>
         <canvas id="cvR" data-i18n-aria="drawArea"></canvas>
         <div class="panel-veil" id="lookVeil" hidden>
           <div class="countdown" id="countdown"><span id="countNum">5</span></div>
@@ -847,7 +858,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
       <p id="payReason"></p>
       <p data-i18n="payIntro">Ein einmaliger Kauf schaltet alles frei. Kein Abo, keine Werbung.</p>
       <ul class="paylist">
-        <li data-i18n="payLevels">Alle 30 Level in 5 Welten</li>
+        <li id="payLevelsItem"></li>
         <li data-i18n="payPlayers">Mehrspieler mit bis zu 4 Personen</li>
         <li data-i18n="payEditor">Eigene Vorlagen zeichnen und teilen</li>
       </ul>
@@ -894,11 +905,15 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
    ================================================================= */
 
 /* -------------------- 1  Konstanten, Speicher -------------------- */
-const APP_VERSION = "0.2.1";
-/* Adresse der Webfassung. QR-Codes verweisen hierhin; die Kamera eines
-   anderen Geräts öffnet den Link, die App übernimmt die Vorlage aus dem
-   Teil hinter dem #. Dieser Teil wird nie an einen Server übertragen. */
-const SHARE_BASE = "https://simaehlmann-cloud.github.io/Drawmory/";
+const APP_VERSION = "0.3.0";
+/* Ziel aller QR-Codes und geteilten Links. Ist Drawmory installiert, öffnet
+   iOS diese Adresse als Universal Link direkt in der App (Freigabe in
+   .well-known/apple-app-site-association der Domain, Plugin drawmory-links).
+   Fehlt die App, erscheint open/index.html mit „In Drawmory öffnen“ und –
+   nach der Veröffentlichung – „Im App Store laden“. Die Vorlage steht im
+   Teil hinter dem #, der nie an einen Server übertragen wird.
+   Ältere Links auf …/Drawmory/#t=… versteht die App weiterhin. */
+const SHARE_BASE = "https://simaehlmann-cloud.github.io/Drawmory/open/";
 const U = 96;                 // Koordinatenraum aller Figuren: 0..96
 const CELL = 8;               // Rasterkästchen = 8 Einheiten -> 12×12 Kästchen
 const LINE_W = 1.5;           // Strichstärke in Einheiten
@@ -923,6 +938,16 @@ const store = {
 const I18N = {
   de: {
     tagline: "Anschauen. Merken. Nachzeichnen.",
+    drawTime: "Zeichenzeit",
+    unlimited: "Unbegrenzt",
+    chipDrawTime: "{n} s Zeichenzeit",
+    taskDrawTime: "Ab dem ersten Strich hast du {n} Sekunden.",
+    timeUp: "Die Zeit ist um – gewertet wurde, was bis dahin gezeichnet war.",
+    worldTimed: "Auf Zeit", worldTimedSub: "Einfache Figuren – aber nur wenige Sekunden zum Zeichnen.",
+    worldMaster: "Meisterstücke", worldMasterSub: "Neue Figuren mit Kreisen und vielen Einzelheiten.",
+    worldCombo: "Alles zusammen", worldComboSub: "Gedächtnis, Maßstab, Spiegeln und Zeitdruck gemischt.",
+    s_plus: "Plus", s_rhombus: "Raute", s_envelope: "Briefumschlag", s_key: "Schlüssel",
+    s_car: "Auto", s_snowman: "Schneemann", s_sun: "Sonne", s_glasses: "Brille",
     legendHit: "trifft",
     legendNear: "knapp",
     legendMiss: "daneben",
@@ -938,7 +963,7 @@ const I18N = {
     showIntro: "Einführung zeigen",
     payTitle: "Drawmory Vollversion",
     payIntro: "Ein einmaliger Kauf schaltet alles frei. Kein Abo, keine Werbung.",
-    payLevels: "Alle 30 Level in 5 Welten",
+    payLevels: "Alle {n} Level in {w} Welten",
     payPlayers: "Mehrspieler mit bis zu 4 Personen",
     payEditor: "Eigene Vorlagen zeichnen und teilen",
     payFine: "Bezahlt wird über deinen Apple-Account. Über „Käufe wiederherstellen“ gilt der Kauf auch auf deinen anderen Geräten mit derselben Apple-ID.",
@@ -950,7 +975,7 @@ const I18N = {
     buyFailed: "Der Kauf wurde nicht abgeschlossen.",
     restoreNone: "Kein früherer Kauf gefunden.",
     unlockedToast: "Vollversion freigeschaltet. Viel Spaß!",
-    reasonLevels: "Level 11 bis 30 gehören zur Vollversion.",
+    reasonLevels: "Level {from} bis {to} gehören zur Vollversion.",
     reasonPlayers: "Mit mehr als 2 Personen zu spielen gehört zur Vollversion.",
     reasonEditor: "Eigene Vorlagen zeichnen gehört zur Vollversion. Importierte Vorlagen kannst du kostenlos spielen.",
     skip: "Überspringen",
@@ -994,7 +1019,7 @@ const I18N = {
     langSwitch: "Sprache wechseln",
     settings: "Einstellungen",
     playLevels: "Level spielen",
-    playLevelsSub: "30 Level in 5 Welten",
+    playLevelsSub: "{n} Level in {w} Welten",
     progressStars: "{s} von {t} Sternen gesammelt",
     freePlay: "Freies Spiel",
     freePlaySub: "Figur und Regeln selbst wählen",
@@ -1137,7 +1162,7 @@ const I18N = {
     reset: "Zurücksetzen",
     aboutTitle: "Über Drawmory",
     aboutText: "Drawmory trainiert genaues Hinsehen, das Gedächtnis für Formen und das Gefühl für Größenverhältnisse.",
-    aboutHow: "Links erscheint eine Figur, rechts zeichnest du sie nach. Manchmal bleibt sie stehen, manchmal nur ein paar Sekunden. In der Welt „Maßstab“ zeichnest du sie doppelt oder halb so groß, in „Spiegeln und Drehen“ als Spiegelbild oder gedreht.",
+    aboutHow: "Links erscheint eine Figur, rechts zeichnest du sie nach. Manchmal bleibt sie stehen, manchmal nur ein paar Sekunden. In der Welt „Maßstab“ zeichnest du sie doppelt oder halb so groß, in „Spiegeln und Drehen“ als Spiegelbild oder gedreht. In „Auf Zeit“ hast du nur wenige Sekunden zum Zeichnen.",
     aboutScoringTitle: "So wird bewertet",
     aboutScoring: "Drawmory legt deine Zeichnung über die Vorlage. Wo du zeichnest, ist egal. Es zählen drei Dinge: wie viel deiner Linie auf der Vorlage liegt, wie viel der Vorlage du getroffen hast und wie gut die Größe passt. Eine sauber gezeichnete Form, die nur etwas zu klein geraten ist, verliert also nur ein wenig. Im Ergebnis zeigen Farben, wo deine Linie trifft.",
     aboutPrivacy: "Drawmory läuft offline, ohne Konto, ohne Werbung und ohne Tracking. Alle Daten bleiben auf diesem Gerät.",
@@ -1153,6 +1178,16 @@ const I18N = {
   },
   en: {
     tagline: "Look. Remember. Redraw.",
+    drawTime: "Drawing time",
+    unlimited: "Unlimited",
+    chipDrawTime: "{n} s to draw",
+    taskDrawTime: "You have {n} seconds from your first stroke.",
+    timeUp: "Time's up – what you had drawn so far was scored.",
+    worldTimed: "Against the clock", worldTimedSub: "Simple shapes – but only a few seconds to draw.",
+    worldMaster: "Masterpieces", worldMasterSub: "New shapes with circles and lots of detail.",
+    worldCombo: "All together", worldComboSub: "Memory, scale, mirroring and time pressure combined.",
+    s_plus: "Plus sign", s_rhombus: "Diamond", s_envelope: "Envelope", s_key: "Key",
+    s_car: "Car", s_snowman: "Snowman", s_sun: "Sun", s_glasses: "Glasses",
     legendHit: "on target",
     legendNear: "close",
     legendMiss: "off",
@@ -1168,7 +1203,7 @@ const I18N = {
     showIntro: "Show introduction",
     payTitle: "Drawmory full version",
     payIntro: "A one-time purchase unlocks everything. No subscription, no ads.",
-    payLevels: "All 30 levels in 5 worlds",
+    payLevels: "All {n} levels in {w} worlds",
     payPlayers: "Multiplayer with up to 4 players",
     payEditor: "Draw and share your own templates",
     payFine: "Payment goes through your Apple account. With “Restore purchases” the purchase also works on your other devices with the same Apple ID.",
@@ -1180,7 +1215,7 @@ const I18N = {
     buyFailed: "The purchase wasn't completed.",
     restoreNone: "No earlier purchase found.",
     unlockedToast: "Full version unlocked. Have fun!",
-    reasonLevels: "Levels 11 to 30 are part of the full version.",
+    reasonLevels: "Levels {from} to {to} are part of the full version.",
     reasonPlayers: "Playing with more than 2 people is part of the full version.",
     reasonEditor: "Drawing your own templates is part of the full version. Imported templates are free to play.",
     skip: "Skip",
@@ -1224,7 +1259,7 @@ const I18N = {
     langSwitch: "Change language",
     settings: "Settings",
     playLevels: "Play levels",
-    playLevelsSub: "30 levels in 5 worlds",
+    playLevelsSub: "{n} levels in {w} worlds",
     progressStars: "{s} of {t} stars collected",
     freePlay: "Free play",
     freePlaySub: "Pick a shape and the rules",
@@ -1367,7 +1402,7 @@ const I18N = {
     reset: "Reset",
     aboutTitle: "About Drawmory",
     aboutText: "Drawmory trains careful looking, memory for shapes and a feel for proportions.",
-    aboutHow: "A shape appears on the left and you redraw it on the right. Sometimes it stays, sometimes only for a few seconds. In the “Scale” world you draw it twice as big or half the size, in “Mirror and rotate” as a mirror image or rotated.",
+    aboutHow: "A shape appears on the left and you redraw it on the right. Sometimes it stays, sometimes only for a few seconds. In the “Scale” world you draw it twice as big or half the size, in “Mirror and rotate” as a mirror image or rotated. In “Against the clock” you only have a few seconds to draw.",
     aboutScoringTitle: "How scoring works",
     aboutScoring: "Drawmory lays your drawing over the original. Where you draw doesn't matter. Three things count: how much of your line lies on the original, how much of the original you covered and how well the size matches. A clean shape that came out a little too small only loses a little. In the result, colors show where your line hits.",
     aboutPrivacy: "Drawmory works offline, with no account, no ads and no tracking. All data stays on this device.",
@@ -1409,6 +1444,15 @@ function starPts(cx, cy, r1, r2, n) {
   }
   return pts;
 }
+/* n Strahlen von Radius r1 bis r2, gleichmäßig verteilt (Sonne) */
+function rays(cx, cy, r1, r2, n) {
+  const out = [];
+  for (let k = 0; k < n; k++) {
+    const a = k * 2 * Math.PI / n;
+    out.push([[cx + r1 * Math.cos(a), cy + r1 * Math.sin(a)], [cx + r2 * Math.cos(a), cy + r2 * Math.sin(a)]]);
+  }
+  return out;
+}
 function heartPts() {
   const pts = [];
   for (let i = 0; i <= 64; i++) {
@@ -1445,12 +1489,21 @@ const SHAPES = {
   cube:     [[[16, 40], [56, 40], [56, 80], [16, 80], [16, 40]], [[16, 40], [40, 16], [80, 16], [56, 40]], [[80, 16], [80, 56], [56, 80]]],
   tree:     [[[48, 8], [72, 40], [56, 40], [80, 72], [16, 72], [40, 40], [24, 40], [48, 8]], [[40, 72], [40, 88], [56, 88], [56, 72]]],
   kite:     [[[48, 8], [72, 40], [48, 72], [24, 40], [48, 8]], [[48, 8], [48, 72]], [[24, 40], [72, 40]], [[48, 72], [40, 80], [56, 88]]],
-  crown:    [[[16, 72], [16, 32], [32, 48], [48, 24], [64, 48], [80, 32], [80, 72], [16, 72]]]
+  crown:    [[[16, 72], [16, 32], [32, 48], [48, 24], [64, 48], [80, 32], [80, 72], [16, 72]]],
+  plus:     [[[48, 16], [48, 80]], [[16, 48], [80, 48]]],
+  rhombus:  [[[48, 12], [76, 48], [48, 84], [20, 48], [48, 12]]],
+  envelope: [[[16, 28], [80, 28], [80, 72], [16, 72], [16, 28]], [[16, 28], [48, 54], [80, 28]]],
+  key:      [ngon(24, 48, 12, 24, 0), [[36, 48], [86, 48]], [[74, 48], [74, 58]], [[86, 48], [86, 60]]],
+  car:      [[[8, 64], [8, 48], [24, 48], [34, 30], [62, 30], [72, 48], [88, 48], [88, 64], [8, 64]],
+             ngon(28, 66, 9, 20, 0), ngon(68, 66, 9, 20, 0)],
+  snowman:  [ngon(48, 68, 20, 36, 0), ngon(48, 36, 12, 24, 0), [[36, 24], [60, 24]], [[40, 24], [40, 10], [56, 10], [56, 24]]],
+  sun:      [ngon(48, 48, 16, 32, 0)].concat(rays(48, 48, 22, 34, 8)),
+  glasses:  [ngon(28, 52, 14, 28, 0), ngon(68, 52, 14, 28, 0), [[42, 50], [48, 46], [54, 50]], [[14, 50], [6, 40]], [[82, 50], [90, 40]]]
 };
 const SHAPE_DIFFICULTY = {
-  easy:   ["line", "slope", "angle", "square", "triangle", "stairs", "house", "arrow"],
-  medium: ["zigzag", "flag", "houseDoor", "bolt", "fish", "boat", "kite", "crown"],
-  hard:   ["rocket", "star", "nikolaus", "circle", "spiral", "heart", "cube", "tree"]
+  easy:   ["line", "slope", "angle", "square", "triangle", "stairs", "house", "arrow", "plus", "rhombus"],
+  medium: ["zigzag", "flag", "houseDoor", "bolt", "fish", "boat", "kite", "crown", "envelope", "key"],
+  hard:   ["rocket", "star", "nikolaus", "circle", "spiral", "heart", "cube", "tree", "car", "snowman", "sun", "glasses"]
 };
 
 /* view: 0 = dauerhaft, sonst Sekunden. scale: 1, 2 oder 0.5 */
@@ -1462,6 +1515,13 @@ const WORLDS = [
     { shape: "triangle", view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true },
     { shape: "stairs",   view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false },
     { shape: "house",    view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false }
+  ]},
+  { key: "worldTimed", levels: [
+    { shape: "plus",     view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  drawTime: 10 },
+    { shape: "square",   view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  drawTime: 8 },
+    { shape: "triangle", view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  drawTime: 8 },
+    { shape: "rhombus",  view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  drawTime: 7 },
+    { shape: "arrow",    view: 0, gridL: true,  gridR: true,  scale: 1, ruler: true,  drawTime: 5 }
   ]},
   { key: "world2", levels: [
     { shape: "arrow",    view: 6, gridL: true,  gridR: true,  scale: 1, ruler: true },
@@ -1494,13 +1554,29 @@ const WORLDS = [
     { shape: "spiral",   view: 6, gridL: true,  gridR: false, scale: 1, ruler: false },
     { shape: "heart",    view: 4, gridL: false, gridR: false, scale: 1, ruler: false },
     { shape: "cube",     view: 0, gridL: true,  gridR: false, scale: 2, ruler: false }
+  ]},
+  { key: "worldMaster", levels: [
+    { shape: "key",      view: 0, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "envelope", view: 5, gridL: true,  gridR: true,  scale: 1, ruler: false },
+    { shape: "car",      view: 0, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "snowman",  view: 0, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "sun",      view: 6, gridL: true,  gridR: false, scale: 1, ruler: false },
+    { shape: "glasses",  view: 4, gridL: false, gridR: false, scale: 1, ruler: false }
+  ]},
+  { key: "worldCombo", levels: [
+    { shape: "flag",     view: 5, gridL: true,  gridR: true,  scale: 1,   ruler: false, transform: "rot90" },
+    { shape: "stairs",   view: 0, gridL: true,  gridR: true,  scale: 2,   ruler: true,  drawTime: 10 },
+    { shape: "arrow",    view: 0, gridL: true,  gridR: true,  scale: 1,   ruler: true,  transform: "mirrorV", drawTime: 7 },
+    { shape: "bolt",     view: 4, gridL: true,  gridR: true,  scale: 0.5, ruler: false },
+    { shape: "key",      view: 0, gridL: true,  gridR: false, scale: 1,   ruler: false, transform: "mirrorH" },
+    { shape: "houseDoor",view: 3, gridL: true,  gridR: false, scale: 1,   ruler: false, drawTime: 8 }
   ]}
 ];
 /* Fortschritt wird je Level-ID gespeichert (Welt + Nummer), nicht nach
    Position. So bleibt er erhalten, wenn später Welten dazukommen. */
 const LEVELS = [];
 WORLDS.forEach((w, wi) => w.levels.forEach((l, li) =>
-  LEVELS.push(Object.assign({ world: wi, id: w.key + "-" + (li + 1), transform: "none" }, l))));
+  LEVELS.push(Object.assign({ world: wi, id: w.key + "-" + (li + 1), transform: "none", drawTime: 0 }, l))));
 
 /* Verwandlungen im Raum 0..96 (y zeigt nach unten) */
 const TRANSFORMS = {
@@ -1528,6 +1604,9 @@ function bestOf(i) { const v = getProgress()[LEVELS[i].id]; return typeof v === 
 function starsFor(score) { return score >= 90 ? 3 : score >= 75 ? 2 : score >= 55 ? 1 : 0; }
 function isUnlocked(i) {
   if (i === 0) return true;
+  /* Schon einmal gespielt: bleibt offen, auch wenn davor neue Level
+     eingefügt wurden (Welt „Auf Zeit“ in Version 0.3). */
+  if (bestOf(i) !== null) return true;
   const best = bestOf(i - 1);
   return best !== null && starsFor(best) >= 1;
 }
@@ -1786,6 +1865,7 @@ function acceptPointer(e) {
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
     game.pointerId = e.pointerId;
     game.active = [evtPoint(cv, e)];
+    startDrawTimer();
     renderRight();
   });
   cv.addEventListener("pointermove", e => {
@@ -1844,6 +1924,7 @@ function settingsChips(round) {
   const st = round.settings, chips = [];
   if (st.transform && st.transform !== "none") chips.push({ text: t("chip_" + st.transform), rule: true });
   if (ONE_STROKE.has(round.shapeId)) chips.push({ text: t("chipOneStroke"), rule: true });
+  if (st.drawTime) chips.push({ text: t("chipDrawTime", { n: st.drawTime }), rule: true });
   chips.push({ text: st.view ? t("chipSeconds", { n: st.view }) : t("chipAlways") });
   if (st.scale === 2) chips.push({ text: t("chipDouble"), rule: true });
   if (st.scale === 0.5) chips.push({ text: t("chipHalf"), rule: true });
@@ -1860,6 +1941,7 @@ function taskText(round) {
     if (st.scale === 0.5) txt += " " + t("taskAlsoHalf");
   } else txt = st.scale === 2 ? t("taskDouble") : st.scale === 0.5 ? t("taskHalf") : t("taskSame");
   if (ONE_STROKE.has(round.shapeId)) txt += " " + t("taskOneStroke");
+  if (st.drawTime) txt += " " + t("taskDrawTime", { n: st.drawTime });
   return txt;
 }
 function renderRoundHead(round) {
@@ -1888,6 +1970,8 @@ function startRound(round, onFinish) {
   document.getElementById("hiddenCard").hidden = true;
   document.getElementById("lookVeil").hidden = true;
   game.locked = false; game.hidden = false;
+  stopDrawTimer();
+  setupDrawTimer();
   showScreen("game", { noPush: currentScreen === "game" || currentScreen === "handoff" });
   if (st.view > 0) beginLookPhase(st.view);
   requestAnimationFrame(layoutGame);
@@ -1921,8 +2005,67 @@ function endLookPhase() {
   updateGameButtons();
 }
 
-function finishDrawing() {
-  if (!game.drawn.length || game.locked || !game.round) return;
+/* --- Zeichenzeit (settings.drawTime in Sekunden, 0 = unbegrenzt) ---
+   Die Uhr startet mit dem ersten Strich, nicht mit dem Öffnen der Runde:
+   Hinschauen kostet keine Zeit, nur das Zeichnen. Ist sie abgelaufen, wird
+   der laufende Strich abgeschlossen und die Zeichnung sofort gewertet. */
+function setupDrawTimer() {
+  const el = document.getElementById("drawTimer");
+  const sec = game.round.settings.drawTime || 0;
+  game.timerStarted = false; game.timedOut = false;
+  el.hidden = !sec;
+  if (!sec) return;
+  el.classList.remove("urgent");
+  el.classList.add("waiting");
+  el.style.setProperty("--p", 1);
+  el.textContent = "⏱ " + t("seconds", { n: sec });
+}
+function formatSeconds(ms) {
+  const v = (Math.ceil(ms / 100) / 10).toFixed(1);
+  return (lang === "de" ? v.replace(".", ",") : v) + " s";
+}
+function startDrawTimer() {
+  const sec = game.round && game.round.settings.drawTime;
+  if (!sec || game.timerStarted) return;
+  game.timerStarted = true;
+  const el = document.getElementById("drawTimer");
+  el.classList.remove("waiting");
+  const total = sec * 1000, t0 = performance.now();
+  const tick = () => {
+    const left = Math.max(0, total - (performance.now() - t0));
+    el.style.setProperty("--p", left / total);
+    el.textContent = "⏱ " + formatSeconds(left);
+    el.classList.toggle("urgent", left < 3000);
+    if (left <= 0) drawTimeUp();
+  };
+  const id = setInterval(tick, 100);
+  timers.add(id);
+  game.drawTimerId = id;
+  tick();
+}
+function stopDrawTimer() {
+  if (game.drawTimerId) { clearInterval(game.drawTimerId); timers.delete(game.drawTimerId); game.drawTimerId = null; }
+}
+function drawTimeUp() {
+  stopDrawTimer();
+  if (!game.round || game.timedOut) return;
+  game.timedOut = true;
+  /* laufenden Strich abschließen, weiteres Zeichnen sperren */
+  if (game.active) {
+    let s = game.active;
+    if (game.round.settings.ruler) s = straighten(s);
+    game.drawn.push(s);
+    game.active = null;
+  }
+  game.pointerId = null;
+  game.locked = true;
+  renderRight();
+  if (game.drawn.length) finishDrawing(true);
+}
+
+function finishDrawing(timeUp) {
+  if (!game.drawn.length || !game.round || (game.locked && !timeUp)) return;
+  stopDrawTimer();
   const st = game.round.settings;
   const { kR } = scaleFactors(st.scale);
   const toTarget = tr => transformStrokes(game.round.strokes, tr).map(s => s.map(p => [p[0] * kR, p[1] * kR]));
@@ -1949,6 +2092,7 @@ function finishDrawing() {
   if (ONE_STROKE.has(game.round.shapeId) && real.length > 1) {
     res.score = Math.min(res.score, 50); res.note = t("oneStrokeFail");
   }
+  if (timeUp === true) res.note = t("timeUp") + (res.note ? " " + res.note : "");
   if (game.onFinish) game.onFinish(res);
 }
 
@@ -1962,7 +2106,7 @@ function startLevel(i) {
   startRound({
     mode: "level", shapeId: L.shape, strokes: SHAPES[L.shape],
     title: t("levelN", { n: i + 1 }) + " · " + shapeName(L.shape),
-    settings: { view: L.view, gridL: L.gridL, gridR: L.gridR, scale: L.scale, ruler: L.ruler, transform: L.transform }
+    settings: { view: L.view, gridL: L.gridL, gridR: L.gridR, scale: L.scale, ruler: L.ruler, transform: L.transform, drawTime: L.drawTime }
   }, res => {
     const prog = getProgress();
     const prevBest = prog[L.id];
@@ -1976,9 +2120,10 @@ function startLevel(i) {
 }
 
 /* --- Freies Spiel --- */
-const free = Object.assign({ shape: "house", view: 0, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none" },
+const free = Object.assign({ shape: "house", view: 0, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none", drawTime: 0 },
   store.get("free", {}) || {});
 if (!TRANSFORMS[free.transform]) free.transform = "none";
+if (![0, 10, 7, 5].includes(free.drawTime)) free.drawTime = 0;
 function pickFreeShape() {
   if (free.shape !== "random") return resolveShape(free.shape);
   const all = Object.keys(SHAPES);
@@ -1997,7 +2142,7 @@ function startFree(overrideShape) {
   const sh = overrideShape || pickFreeShape();
   startRound({
     mode: "free", shapeId: sh.id, strokes: sh.strokes, title: sh.name,
-    settings: { view: free.view, gridL: free.gridL, gridR: free.gridR, scale: free.scale, ruler: free.ruler, transform: free.transform }
+    settings: { view: free.view, gridL: free.gridL, gridR: free.gridR, scale: free.scale, ruler: free.ruler, transform: free.transform, drawTime: free.drawTime }
   }, res => {
     showResult(res, { actions: [
       { label: t("retry"), cls: "", fn: () => startFree(sh) },
@@ -2266,11 +2411,12 @@ function scoreDrawing(target, drawn) {
 
 /* -------------------- 9  Mehrspieler -------------------- */
 const multi = Object.assign(
-  { count: 2, names: ["", "", "", ""], rounds: 3, pool: "medium", view: 5, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none" },
+  { count: 2, names: ["", "", "", ""], rounds: 3, pool: "medium", view: 5, gridL: true, gridR: true, scale: 1, ruler: false, transform: "none", drawTime: 0 },
   store.get("multi", {}) || {}
 );
 if (!Array.isArray(multi.names) || multi.names.length !== 4) multi.names = ["", "", "", ""];
 if (!TRANSFORMS[multi.transform]) multi.transform = "none";
+if (![0, 10, 7, 5].includes(multi.drawTime)) multi.drawTime = 0;
 if (![2, 3, 4].includes(multi.count)) multi.count = 2;
 let match = null;   // { players:[{name,color}], rounds:[{shape, results:[]}], r, p }
 
@@ -2314,7 +2460,7 @@ function beginTurn() {
   startRound({
     mode: "multi", shapeId: sh.id, strokes: sh.strokes, color: pl.color, playerName: pl.name,
     title: pl.name + " · " + t("roundOf", { r: match.r + 1, n: match.rounds.length }),
-    settings: { view: multi.view, gridL: multi.gridL, gridR: multi.gridR, scale: multi.scale, ruler: multi.ruler, transform: multi.transform }
+    settings: { view: multi.view, gridL: multi.gridL, gridR: multi.gridR, scale: multi.scale, ruler: multi.ruler, transform: multi.transform, drawTime: multi.drawTime }
   }, res => {
     match.rounds[match.r].results[match.p] = res;
     match.p++;
@@ -2794,9 +2940,16 @@ function checkHashImport() {
   askImport(h, !window.cordova);
   return true;
 }
-/* Aufruf durch cordova-plugin-customurlscheme, wenn ein drawmory://-Link die App öffnet */
+/* Wird von Cordova (drawmory://-Links) und vom Plugin drawmory-links
+   (Universal Links, Kaltstart) aufgerufen. Derselbe Link kann dabei zweimal
+   eintreffen – das zweite Mal innerhalb weniger Sekunden wird verworfen. */
+let lastOpenedLink = { url: "", at: 0 };
 window.handleOpenURL = function (url) {
-  setTimeout(() => { if (/[#&?]t=/.test(String(url))) askImport(url, false); }, 0);
+  const u = String(url || "");
+  const now = Date.now();
+  if (u === lastOpenedLink.url && now - lastOpenedLink.at < 5000) return;
+  lastOpenedLink = { url: u, at: now };
+  setTimeout(() => { if (/[#&?]t=/.test(u)) askImport(u, false); }, 0);
 };
 
 let shareList = null;
@@ -3092,7 +3245,8 @@ const QR = (function () {
    auf Android über Google Play Billing. Ohne Belegprüfung auf einem Server
    gilt ein Kauf als bestätigt, sobald der Store ihn meldet. */
 const PRODUCT_ID = "de.drawmory.app.full";
-const FREE_LEVELS = 10;
+/* Gratis: die Welten „Erste Linien“ und „Auf Zeit“ */
+const FREE_LEVELS = 11;
 const FREE_PLAYERS = 2;
 const shop = { ready: false, price: "", busy: false, error: "", reason: null };
 
@@ -3144,7 +3298,9 @@ function openPaywall(reasonKey) {
 }
 function updatePaywall() {
   const r = document.getElementById("payReason");
-  r.hidden = !shop.reason; r.textContent = shop.reason ? t(shop.reason) : "";
+  r.hidden = !shop.reason;
+  r.textContent = shop.reason ? t(shop.reason, { from: FREE_LEVELS + 1, to: LEVELS.length }) : "";
+  document.getElementById("payLevelsItem").textContent = t("payLevels", { n: LEVELS.length, w: WORLDS.length });
   const buy = document.getElementById("btnBuy");
   buy.textContent = shop.price ? t("buyFor", { price: shop.price }) : t("buyLoading");
   buy.disabled = !shop.ready || shop.busy;
@@ -3225,7 +3381,7 @@ function finishIntro() { store.set("seenIntro", true); closeModals(); }
 
 /* -------------------- 14  Einstellungen, Seiten, Start -------------------- */
 function renderHome() {
-  const prog = getProgress();
+  document.getElementById("levelsSub").textContent = t("playLevelsSub", { n: LEVELS.length, w: WORLDS.length });
   let s = 0;
   LEVELS.forEach((_, i) => { const v = bestOf(i); if (v !== null) s += starsFor(v); });
   document.getElementById("homeProgress").textContent = s ? t("progressStars", { s, t: LEVELS.length * 3 }) : "";
@@ -3298,6 +3454,7 @@ function renderRules(container, cfg, onChange) {
     row.append(l, b); container.appendChild(row);
   };
   seg(t("viewTime"), [[0, t("always")], [8, t("seconds", { n: 8 })], [5, t("seconds", { n: 5 })], [3, t("seconds", { n: 3 })], [2, t("seconds", { n: 2 })]], "view");
+  seg(t("drawTime"), [[0, t("unlimited")], [10, t("seconds", { n: 10 })], [7, t("seconds", { n: 7 })], [5, t("seconds", { n: 5 })]], "drawTime");
   seg(t("size"), [[1, t("sizeSame")], [2, t("sizeDouble")], [0.5, t("sizeHalf")]], "scale");
   seg(t("transform"), [["none", t("trNone")], ["mirrorV", t("trMirrorV")], ["mirrorH", t("trMirrorH")], ["rot90", t("trRot90")], ["rot180", t("trRot180")]], "transform");
   const box = document.createElement("div"); box.style.marginTop = "6px"; container.appendChild(box);
@@ -3457,7 +3614,7 @@ const ACTIONS = {
   skipLook: () => endLookPhase(),
   undo: () => { if (game.locked) return; game.drawn.pop(); renderRight(); },
   clearDrawing: () => { if (game.locked) return; game.drawn = []; renderRight(); },
-  finishDrawing: () => finishDrawing(),
+  finishDrawing: () => finishDrawing(false),
   newTemplate: () => { if (isFull()) openEditor(null); else openPaywall("reasonEditor"); },
   selectMode: () => { selecting = true; selected.clear(); renderTemplates(); },
   selectCancel: () => { selecting = false; selected.clear(); renderTemplates(); },

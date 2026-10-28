@@ -54,14 +54,26 @@ try {
     if (![1, 2, 0.5].includes(l.scale)) E(`Level ${i + 1}: Maßstab ${l.scale} nicht vorgesehen`);
     if (l.transform && !TRANSFORMS[l.transform]) E(`Level ${i + 1}: unbekannte Verwandlung ${l.transform}`);
   });
-  /* Die Zahlen auf der Startseite und im Kaufdialog müssen stimmen */
-  const promise = (I18N.de.playLevelsSub.match(/^(\d+) Level in (\d+) Welten$/) || []);
-  if (+promise[1] !== lv.length || +promise[2] !== WORLDS.length)
-    E(`Startseite verspricht "${I18N.de.playLevelsSub}", es sind ${lv.length} Level in ${WORLDS.length} Welten`);
-  for (const l of ["de", "en"]) if (!I18N[l].payLevels.includes(String(lv.length))) E(`payLevels (${l}) nennt nicht ${lv.length} Level`);
+  /* Zahlen auf Startseite und im Kaufdialog werden zur Laufzeit eingesetzt.
+     Geprüft wird, dass die Texte Platzhalter tragen (keine veralteten festen
+     Zahlen) und dass der Code sie mit den echten Werten füllt. */
+  for (const l of ["de", "en"]) {
+    if (!/\{n\}/.test(I18N[l].playLevelsSub) || !/\{w\}/.test(I18N[l].playLevelsSub)) E(`playLevelsSub (${l}) ohne Platzhalter {n}/{w}`);
+    if (!/\{n\}/.test(I18N[l].payLevels) || !/\{w\}/.test(I18N[l].payLevels)) E(`payLevels (${l}) ohne Platzhalter {n}/{w}`);
+    if (!/\{from\}/.test(I18N[l].reasonLevels) || !/\{to\}/.test(I18N[l].reasonLevels)) E(`reasonLevels (${l}) ohne Platzhalter {from}/{to}`);
+    for (const k of ["playLevelsSub", "payLevels", "reasonLevels"]) if (/\d/.test(I18N[l][k].replace(/\{\w+\}/g, ""))) E(`${k} (${l}) enthält eine feste Zahl`);
+  }
+  if (!/t\("playLevelsSub", \{ n: LEVELS\.length, w: WORLDS\.length \}\)/.test(js)) E("playLevelsSub wird nicht mit Level- und Weltenzahl gefüllt");
+  if (!/t\("payLevels", \{ n: LEVELS\.length, w: WORLDS\.length \}\)/.test(js)) E("payLevels wird nicht mit Level- und Weltenzahl gefüllt");
+  if (!/from: FREE_LEVELS \+ 1, to: LEVELS\.length/.test(js)) E("reasonLevels wird nicht mit FREE_LEVELS und Levelzahl gefüllt");
   const free = +(js.match(/const FREE_LEVELS = (\d+);/) || [])[1];
-  if (!I18N.de.reasonLevels.includes(String(free + 1)) || !I18N.de.reasonLevels.includes(String(lv.length)))
-    E("reasonLevels passt nicht zu FREE_LEVELS und Levelzahl");
+  /* Gratis-Grenze soll auf eine Weltgrenze fallen */
+  let acc = 0; const borders = WORLDS.map(w => (acc += w.levels.length));
+  if (!borders.includes(free)) E(`FREE_LEVELS = ${free} liegt mitten in einer Welt (Grenzen: ${borders.join(", ")})`);
+  /* Zeichenzeit: nur Werte, die auch die Regler anbieten */
+  lv.forEach((l, i) => { if (l.drawTime !== undefined && !(Number.isInteger(l.drawTime) && l.drawTime >= 3 && l.drawTime <= 15)) E(`Level ${i + 1}: Zeichenzeit ${l.drawTime} s nicht sinnvoll`); });
+  const ids = WORLDS.flatMap(w => w.levels.map((_, li) => w.key + "-" + (li + 1)));
+  if (new Set(WORLDS.map(w => w.key)).size !== WORLDS.length) E("Doppelte Welt-Schlüssel – Fortschritts-IDs würden kollidieren");
   O(`${Object.keys(SHAPES).length} Figuren, ${lv.length} Level`);
 } catch (e) { E("Daten nicht auswertbar: " + e.message); }
 
@@ -173,6 +185,83 @@ else {
   if (!swCache || !swCache.endsWith(appVer)) E(`sw.js cached unter "${swCache}", die App ist ${appVer}`);
   if (!readme.includes(appVer)) E(`README.md nennt Version ${appVer} nicht`);
   if (!errors.some(e => e.includes("Version") || e.includes("cached unter"))) O(`Version ${appVer} überall gleich`);
+}
+
+/* 7a. Geteilte Links: Domain, Plugin, Apple-Freigabe und Landeseite passen zusammen */
+{
+  const base = (js.match(/const SHARE_BASE = "([^"]+)";/) || [])[1] || "";
+  let host = "", path = "";
+  try { const u = new URL(base); host = u.host; path = u.pathname; } catch (e) { E("SHARE_BASE ist keine gültige Adresse: " + base); }
+  const cfgHost = (cfg.match(/name="LINK_HOST" value="([^"]+)"/) || [])[1];
+  if (cfgHost !== host) E(`config.xml: LINK_HOST ${cfgHost}, SHARE_BASE zeigt auf ${host}`);
+  const pxml = "cordova-plugins/drawmory-links/plugin.xml";
+  if (!fs.existsSync(pxml)) E("Plugin drawmory-links fehlt");
+  else {
+    const p = fs.readFileSync(pxml, "utf8");
+    if (!new RegExp('preference name="LINK_HOST" default="' + host.replace(/\./g, "\\.") + '"').test(p)) E("plugin.xml: Standard-LINK_HOST weicht von SHARE_BASE ab");
+    if (!/applinks:\$LINK_HOST/.test(p)) E("plugin.xml trägt applinks:$LINK_HOST nicht ein");
+    if (!/Entitlements-Release\.plist/.test(p)) E("plugin.xml: Associated Domains nicht für Release eingetragen");
+    if (/Entitlements-Debug\.plist/.test(p)) E("plugin.xml: Associated Domains im Debug-Build würde den unsignierten Simulator-Build gefährden");
+    for (const f of ["cordova-plugins/drawmory-links/src/ios/DrawmoryLinks.m", "cordova-plugins/drawmory-links/package.json"]) if (!fs.existsSync(f)) E("Plugin-Datei fehlt: " + f);
+    const m = fs.readFileSync("cordova-plugins/drawmory-links/src/ios/DrawmoryLinks.m", "utf8");
+    if (!/handleOpenURL/.test(m) || !/CDVPluginContinueUserActivityNotification/.test(m)) E("DrawmoryLinks.m reicht Universal Links nicht an handleOpenURL weiter");
+  }
+  if (!/spec="\.\.\/cordova-plugins\/drawmory-links"/.test(cfg)) E("config.xml bindet das Plugin drawmory-links nicht ein");
+  /* Apple-Freigabe: Pfade decken neue und alte Links ab */
+  const aasaFile = "universal-links/.well-known/apple-app-site-association";
+  if (!fs.existsSync(aasaFile)) E("Vorlage der Apple-Freigabe fehlt: " + aasaFile);
+  else {
+    let aasa = null;
+    try { aasa = JSON.parse(fs.readFileSync(aasaFile, "utf8")); } catch (e) { E("apple-app-site-association ist kein gültiges JSON"); }
+    if (aasa) {
+      const d = (aasa.applinks && aasa.applinks.details) || [];
+      const appId = (cfg.match(/<widget id="([^"]+)"/) || [])[1];
+      if (!d.some(x => (x.appIDs || []).some(a => a.endsWith("." + appId)))) E(`apple-app-site-association nennt ${appId} nicht`);
+      const comps = d.flatMap(x => x.components || []);
+      const glob = g => new RegExp("^" + g.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*").replace(/\?/g, ".") + "$");
+      const covers = (p, frag) => comps.some(c => glob(c["/"] || "*").test(p) && (!c["#"] || (frag !== undefined && glob(c["#"]).test(frag))));
+      if (!covers(path, "t=AQxyz")) E(`Apple-Freigabe deckt ${path} nicht ab – QR-Codes öffnen die App nicht`);
+      if (!covers("/Drawmory/", "t=AQxyz")) E("Apple-Freigabe deckt alte Links /Drawmory/#t=… nicht ab");
+      if (covers("/Drawmory/datenschutz.html", undefined) || covers("/Drawmory/", undefined))
+        E("Apple-Freigabe ist zu weit – Datenschutz oder Webfassung würden in die App umgeleitet");
+    }
+  }
+  if (!fs.existsSync("universal-links/.nojekyll")) E("universal-links/.nojekyll fehlt – GitHub Pages würde .well-known nicht ausliefern");
+  /* Landeseite: vorhanden, gleicher Decoder wie die App */
+  if (!fs.existsSync("open/index.html")) E("Landeseite open/index.html fehlt");
+  else {
+    const oh = fs.readFileSync("open/index.html", "utf8");
+    const sid = (oh.match(/const APP_STORE_ID = "([^"]*)";/) || [])[1];
+    if (sid === undefined) E("open/index.html: APP_STORE_ID fehlt");
+    else if (sid && !/^\d{6,12}$/.test(sid)) E("APP_STORE_ID muss die Apple-ID aus Ziffern sein: " + sid);
+    if (!/drawmory:\/\/import#t=/.test(oh)) E("Landeseite bietet „In Drawmory öffnen“ nicht an");
+    try {
+      const pick = (src, from, to) => src.slice(src.indexOf(from), src.indexOf(to, src.indexOf(from)));
+      const ctxA = { TextDecoder, atob: s => Buffer.from(s, "base64").toString("binary"), Uint8Array }, ctxB = Object.assign({}, ctxA);
+      vm.createContext(ctxA); vm.createContext(ctxB);
+      vm.runInContext("const U=96,MAX_POINTS=600;function pointCount(st){return st.reduce((a,s)=>a+s.length,0)}" +
+        pick(js, "const PACK_MAX", "/* Kurzform") + ";this.dec=decodeShare;this.enc=encodeShare;" +
+        "function btoa(s){return Buffer.from(s,'binary').toString('base64')}", Object.assign(ctxA, { Buffer, TextEncoder }));
+      const ohs = oh.slice(oh.indexOf('"use strict";'), oh.indexOf("function drawPreview"));
+      vm.runInContext(ohs.replace(/^"use strict";[\s\S]*?const U = 96/, "const U = 96") + ";this.dec=decodeShare;", ctxB);
+      let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      let same = 0, total = 0;
+      for (let k = 0; k < 300; k++) {
+        const n = 1 + Math.floor(rnd() * 4);
+        const list = Array.from({ length: n }, (_, j) => ({ name: "Fig" + j + (rnd() < .3 ? "Ä€" : ""),
+          strokes: Array.from({ length: 1 + Math.floor(rnd() * 3) }, () => Array.from({ length: 1 + Math.floor(rnd() * 6) }, () => [Math.floor(rnd() * 97), Math.floor(rnd() * 97)])) }));
+        let code = ctxA.enc(list);
+        if (rnd() < .3) code = code.slice(0, -1) + (code.slice(-1) === "A" ? "B" : "A");   // beschädigt
+        const a = ctxA.dec(code), b = ctxB.dec(code);
+        total++;
+        if (JSON.stringify(a) === JSON.stringify(b ? b.list : null)) same++;
+      }
+      if (same !== total) E(`Landeseite und App lesen Codes unterschiedlich (${same}/${total} gleich)`);
+      else O(`Landeseite und App lesen 300 Codes gleich (gültige und beschädigte)`);
+    } catch (e) { E("Decoder-Vergleich nicht ausführbar: " + e.message); }
+  }
+  if (!errors.some(e => /SHARE_BASE|LINK_HOST|Plugin|plugin|Apple-Freigabe|apple-app|Landeseite|APP_STORE_ID|nojekyll/.test(e)))
+    O(`Geteilte Links: ${base} → App (${host}), sonst Landeseite`);
 }
 
 /* 7b. Workflows passen zur App */

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<title>Drawmory – Vorlage öffnen</title>
+<meta name="theme-color" content="#F5F8FC">
+<link rel="icon" href="../icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<script>
+/* =================================================================
+   Landeseite für geteilte Drawmory-Vorlagen
+   -----------------------------------------------------------------
+   Ziel aller QR-Codes und geteilten Links ab Version 0.3:
+     https://simaehlmann-cloud.github.io/Drawmory/open/#t=<code>
+
+   Ist Drawmory installiert, öffnet iOS den Link als Universal Link
+   direkt in der App – diese Seite erscheint dann gar nicht. Sie ist der
+   Rückfall, wenn die App fehlt oder der Link im Browser landet.
+
+   Nach der Veröffentlichung im App Store hier die Apple-ID der App
+   eintragen (App Store Connect → App-Informationen → Apple-ID, nur
+   Ziffern). Dann erscheint der Knopf „Im App Store laden“ und Safari
+   zeigt zusätzlich das App-Banner.
+   ================================================================= */
+const APP_STORE_ID = "";
+if (/^\d{6,12}$/.test(APP_STORE_ID)) {
+  document.write('<meta name="apple-itunes-app" content="app-id=' + APP_STORE_ID + '">');
+}
+</script>
+<style>
+:root {
+  --paper: #F5F8FC; --grid: #DFE7F2; --card: #FFFFFF; --line: #D5DCEB;
+  --text: #1A2147; --muted: #5B6488; --ink: #2A3BB7; --ink-soft: #E4E8FB; --pen: #D92A6E;
+  --font-display: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #131932; --grid: #1C2447; --card: #1B2243; --line: #2E3866; --text: #EEF0FA;
+          --muted: #A3AAC8; --ink: #8D9DFF; --ink-soft: #262F6B; --pen: #FF5C9D; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+/* .btn setzt display:flex – ohne diese Regel bliebe ein versteckter Knopf sichtbar */
+[hidden] { display: none !important; }
+body {
+  margin: 0; min-height: 100vh;
+  padding: calc(24px + env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) calc(32px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background-color: var(--paper); color: var(--text);
+  background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 24px 24px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; line-height: 1.45;
+}
+main { max-width: 520px; margin: 0 auto; text-align: center; }
+.wordmark { font-family: var(--font-display); font-weight: 900; font-size: 44px; letter-spacing: -.02em; margin: 0 0 18px; }
+.wordmark .a { color: var(--ink); } .wordmark .b { color: var(--pen); }
+.card { background: var(--card); border: 2px solid var(--line); border-radius: 24px; padding: 22px 20px; }
+h1 { font-family: var(--font-display); font-size: 24px; line-height: 1.2; margin: 6px 0 4px; text-wrap: balance; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+.previews { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 0 0 18px; }
+.previews figure { margin: 0; width: 112px; }
+.previews canvas { width: 112px; height: 112px; display: block; border-radius: 14px; background: var(--paper); }
+.previews figcaption { font-size: 13px; font-weight: 700; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 54px; padding: 0 22px; margin: 10px 0 0; border-radius: 999px;
+  font-weight: 800; font-size: 18px; text-decoration: none; border: 2px solid var(--line);
+  color: var(--text); background: var(--card);
+}
+.btn.primary { background: var(--pen); border-color: var(--pen); color: #fff; }
+.btn.store { background: var(--ink); border-color: var(--ink); color: #fff; }
+.note { color: var(--muted); font-size: 15px; margin: 14px 0 0; }
+.small { display: inline-block; margin-top: 18px; color: var(--muted); font-size: 15px; }
+.error { color: #C02E2E; font-weight: 700; }
+a:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+footer { margin-top: 22px; font-size: 13px; color: var(--muted); }
+footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <p class="wordmark"><span class="a">Draw</span><span class="b">mory</span></p>
+  <div class="card">
+    <h1 id="title"></h1>
+    <p class="sub" id="sub"></p>
+    <div class="previews" id="previews"></div>
+    <a class="btn primary" id="openApp" href="drawmory://"></a>
+    <a class="btn store" id="store" hidden></a>
+    <p class="note" id="soon" hidden></p>
+    <a class="small" id="web" href="../"></a>
+  </div>
+  <footer>
+    <a id="privacy" href="../datenschutz.html"></a> · <a id="imprint" href="../impressum.html"></a>
+  </footer>
+</main>
+<script>
+"use strict";
+const TXT = {
+  de: {
+    one: "„{name}“ nachzeichnen", many: "{n} Vorlagen nachzeichnen",
+    sub: "Diese Vorlage wurde mit Drawmory geteilt.", subMany: "Diese Vorlagen wurden mit Drawmory geteilt.",
+    open: "In Drawmory öffnen", store: "Im App Store laden",
+    soon: "Drawmory erscheint bald im App Store. Ist die App schon installiert, tippe auf „In Drawmory öffnen“.",
+    web: "Ohne App im Browser ausprobieren", bad: "Dieser Link ist unvollständig. Bitte den QR-Code noch einmal scannen.",
+    plain: "Drawmory", plainSub: "Anschauen. Merken. Nachzeichnen.",
+    privacy: "Datenschutz", imprint: "Impressum"
+  },
+  en: {
+    one: "Redraw “{name}”", many: "Redraw {n} templates",
+    sub: "This template was shared with Drawmory.", subMany: "These templates were shared with Drawmory.",
+    open: "Open in Drawmory", store: "Get it on the App Store",
+    soon: "Drawmory is coming to the App Store soon. If the app is already installed, tap “Open in Drawmory”.",
+    web: "Try it in the browser without the app", bad: "This link is incomplete. Please scan the QR code again.",
+    plain: "Drawmory", plainSub: "Look. Remember. Redraw.",
+    privacy: "Privacy", imprint: "Legal notice"
+  }
+};
+const lang = (navigator.language || "de").toLowerCase().startsWith("de") ? "de" : "en";
+document.documentElement.lang = lang;
+const T = (k, v) => TXT[lang][k].replace(/\{(\w+)\}/g, (m, x) => (v && x in v ? v[x] : m));
+
+/* Gleiches Format wie decodeShare() in ../index.html (v1 eine Vorlage, v2 Paket).
+   validate.js prüft, dass beide Fassungen dieselben Ergebnisse liefern. */
+const U = 96, PACK_MAX = 20, MAX_POINTS = 600;
+function readTpl(bytes, i, end) {
+  if (i >= end) return null;
+  const nl = bytes[i++];
+  if (i + nl > end) return null;
+  const name = new TextDecoder("utf-8", { fatal: false }).decode(new Uint8Array(bytes.slice(i, i + nl)))
+    .replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, 30) || "Drawmory";
+  i += nl;
+  if (i >= end) return null;
+  const sc = bytes[i++];
+  if (!sc) return null;
+  const strokes = [];
+  let points = 0;
+  for (let s = 0; s < sc; s++) {
+    if (i >= end) return null;
+    const pc = bytes[i++];
+    if (!pc || i + pc * 2 > end) return null;
+    const st = [];
+    for (let p = 0; p < pc; p++) {
+      const x = bytes[i++], y = bytes[i++];
+      if (x > U || y > U) return null;
+      st.push([x, y]);
+    }
+    points += st.length;
+    strokes.push(st);
+  }
+  if (points > MAX_POINTS) return null;
+  return { tpl: { name, strokes }, i };
+}
+function decodeShare(text) {
+  try {
+    let code = String(text || "").trim();
+    const m = code.match(/[#&?]t=([A-Za-z0-9_-]+)/);
+    if (m) code = m[1];
+    if (!/^[A-Za-z0-9_-]{8,6000}$/.test(code)) return null;
+    let b64 = code.replace(/-/g, "+").replace(/_/g, "/");
+    while (b64.length % 4) b64 += "=";
+    const bytes = Array.from(atob(b64), c => c.charCodeAt(0));
+    if (bytes.length < 6) return null;
+    const end = bytes.length - 1;
+    const sum = bytes.slice(0, end).reduce((a, b) => (a + b) & 255, 0);
+    if (sum !== bytes[end]) return null;
+    const list = [];
+    let i;
+    if (bytes[0] === 1) {
+      const r = readTpl(bytes, 1, end);
+      if (!r) return null;
+      list.push(r.tpl); i = r.i;
+    } else if (bytes[0] === 2) {
+      const n = bytes[1];
+      if (n < 2 || n > PACK_MAX) return null;
+      i = 2;
+      for (let k = 0; k < n; k++) {
+        const r = readTpl(bytes, i, end);
+        if (!r) return null;
+        list.push(r.tpl); i = r.i;
+      }
+    } else return null;
+    if (i !== end) return null;
+    return { list, code };
+  } catch (e) { return null; }
+}
+
+function drawPreview(cv, strokes) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const size = 112 * dpr;
+  cv.width = size; cv.height = size;
+  const ctx = cv.getContext("2d");
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  strokes.forEach(s => s.forEach(p => { x0 = Math.min(x0, p[0]); y0 = Math.min(y0, p[1]); x1 = Math.max(x1, p[0]); y1 = Math.max(y1, p[1]); }));
+  const span = Math.max(x1 - x0, y1 - y0, 24), sc = size * 0.8 / span;
+  const ox = size / 2 - (x0 + x1) / 2 * sc, oy = size / 2 - (y0 + y1) / 2 * sc;
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--ink").trim();
+  ctx.lineWidth = 3.2 * dpr; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  strokes.forEach(s => {
+    ctx.beginPath();
+    s.forEach((p, k) => (k ? ctx.lineTo : ctx.moveTo).call(ctx, ox + p[0] * sc, oy + p[1] * sc));
+    if (s.length === 1) ctx.lineTo(ox + s[0][0] * sc + 0.1, oy + s[0][1] * sc);
+    ctx.stroke();
+  });
+}
+
+function render() {
+  const $ = id => document.getElementById(id);
+  /* Zustand zurücksetzen – render() läuft auch bei jedem Wechsel des Codes */
+  $("previews").textContent = "";
+  $("sub").classList.remove("error");
+  $("openApp").href = "drawmory://";
+  $("web").href = "../";
+  $("privacy").textContent = T("privacy");
+  $("imprint").textContent = T("imprint");
+  if (lang === "en") { $("privacy").href = "../datenschutz-en.html"; $("imprint").href = "../impressum-en.html"; }
+  $("web").textContent = T("web");
+  $("openApp").textContent = T("open");
+
+  const hasCode = /[#&?]t=/.test(location.hash);
+  const res = hasCode ? decodeShare(location.hash) : null;
+  if (res) {
+    const list = res.list;
+    $("title").textContent = list.length === 1 ? T("one", { name: list[0].name }) : T("many", { n: list.length });
+    $("sub").textContent = list.length === 1 ? T("sub") : T("subMany");
+    const box = $("previews");
+    list.slice(0, 6).forEach(tp => {
+      const fig = document.createElement("figure");
+      const cv = document.createElement("canvas");
+      const cap = document.createElement("figcaption");
+      cap.textContent = tp.name;
+      fig.append(cv, cap); box.appendChild(fig);
+      drawPreview(cv, tp.strokes);
+    });
+    $("openApp").href = "drawmory://import#t=" + res.code;
+    $("web").href = "../#t=" + res.code;
+    document.title = "Drawmory – " + (list.length === 1 ? list[0].name : T("many", { n: list.length }));
+  } else {
+    $("title").textContent = T("plain");
+    $("sub").textContent = hasCode ? T("bad") : T("plainSub");
+    if (hasCode) $("sub").classList.add("error");
+  }
+  if (/^\d{6,12}$/.test(APP_STORE_ID)) {
+    $("store").hidden = false;
+    $("store").textContent = T("store");
+    $("store").href = "https://apps.apple.com/app/id" + APP_STORE_ID;
+  } else {
+    $("soon").hidden = false;
+    $("soon").textContent = T("soon");
+  }
+}
+render();
+/* Neuer Code in derselben Seite (z. B. zweiter QR-Code im selben Tab) */
+window.addEventListener("hashchange", render);
+</script>
+</body>
+</html>

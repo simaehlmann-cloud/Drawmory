@@ -2,9 +2,9 @@
 <!-- Paketkennung: nach der ersten Veröffentlichung unveränderlich.
      Vor dem Anlegen in App Store Connect bewusst festlegen. -->
 <widget id="de.drawmory.app"
-        version="0.2.1"
-        android-versionCode="201"
-        ios-CFBundleVersion="201"
+        version="0.3.0"
+        android-versionCode="300"
+        ios-CFBundleVersion="300"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
 
@@ -95,8 +95,19 @@
     <plugin name="cordova-plugin-purchase" spec="^13.10.0" />
 
     <!-- drawmory://import#t=… öffnet die App und übernimmt Vorlagen.
-         Die Webfassung bietet diesen Link nach dem Scannen eines QR-Codes an. -->
+         Die Landeseite open/ bietet diesen Link an, wenn der Universal Link
+         nicht direkt in die App geführt hat. -->
     <plugin name="cordova-plugin-customurlscheme" spec="^5.0.2">
         <variable name="URL_SCHEME" value="drawmory" />
+    </plugin>
+
+    <!-- Universal Links: QR-Codes und geteilte https-Links öffnen die App
+         direkt, sofern installiert. Eigenes Plugin im Repo, weil cordova-ios 8
+         diese Links nicht an JavaScript weitergibt. LINK_HOST muss zur Domain
+         in SHARE_BASE (index.html) und zur Datei
+         .well-known/apple-app-site-association dieser Domain passen.
+         Der Pfad gilt relativ zum Cordova-Projekt "build" im Workflow. -->
+    <plugin name="drawmory-links" spec="../cordova-plugins/drawmory-links">
+        <variable name="LINK_HOST" value="simaehlmann-cloud.github.io" />
     </plugin>
 </widget>

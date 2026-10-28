@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  drawmory-links – reicht geöffnete Links an die Web-App weiter.
+
+  Warum ein eigenes Plugin: cordova-ios 8 arbeitet mit UIScene. Es meldet
+  Universal Links (https://simaehlmann-cloud.github.io/Drawmory/open/#t=…)
+  zwar intern als CDVPluginContinueUserActivityNotification, ruft dafür aber
+  kein JavaScript auf. Außerdem startet Cordova seine Plugins erst in
+  viewDidLoad – ein Link, mit dem die App frisch gestartet wird, käme dann
+  zu früh und ginge verloren. Dieses Plugin fängt beide Fälle ab und ruft
+  das globale handleOpenURL(url) der App auf, sobald die Seite geladen ist.
+
+  Doppelte Zustellung (Cordova liefert drawmory://-Links teils selbst) fängt
+  handleOpenURL in index.html ab.
+
+  Die Fähigkeit "Associated Domains" wird nur für Release-Builds eingetragen.
+  Der unsignierte Simulator-Build im Workflow bleibt davon unberührt.
+-->
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="drawmory-links"
+        version="1.0.0">
+
+    <name>Drawmory Links</name>
+    <description>Universal Links und App-Links beim Kalt- und Warmstart an handleOpenURL weiterreichen.</description>
+    <license>Proprietär – Wisdompeak Apps</license>
+
+    <!-- Domain der Universal Links. Muss zu SHARE_BASE in index.html und zur
+         Datei .well-known/apple-app-site-association auf dieser Domain passen. -->
+    <preference name="LINK_HOST" default="simaehlmann-cloud.github.io" />
+
+    <engines>
+        <engine name="cordova-ios" version=">=8.0.0" />
+    </engines>
+
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="DrawmoryLinks">
+                <param name="ios-package" value="DrawmoryLinks" />
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+
+        <source-file src="src/ios/DrawmoryLinks.m" />
+
+        <config-file target="*/Entitlements-Release.plist" parent="com.apple.developer.associated-domains">
+            <array>
+                <string>applinks:$LINK_HOST</string>
+            </array>
+        </config-file>
+    </platform>
+</plugin>

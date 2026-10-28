@@ -58,6 +58,18 @@ const scaled = (strokes, k) => strokes.map(s => s.map(p => [p[0] * k, p[1] * k])
 async function unlockUpTo(page, n) {
   await page.evaluate(n => { const p = getProgress(); LEVELS.slice(0, n).forEach(l => { p[l.id] = 95; }); store.set("progress", p); renderLevels(); }, n);
 }
+/* Level über ihre feste ID ansprechen – Positionen verschieben sich, wenn Welten dazukommen */
+async function levelIndex(page, id) {
+  const i = await page.evaluate(id => LEVELS.findIndex(l => l.id === id), id);
+  if (i < 0) throw new Error("Level-ID unbekannt: " + id);
+  return i;
+}
+async function openLevel(page, id) {
+  const i = await levelIndex(page, id);
+  await unlockUpTo(page, i);
+  await page.locator(".lvl").nth(i).click();
+  return i;
+}
 /* Zählt Pixel im Ergebniskanal, die der Farbe eines CSS-Tokens nahekommen */
 async function countColor(page, canvasId, token) {
   return page.evaluate(([id, tok]) => {
@@ -113,6 +125,7 @@ const mockStore = platformId => `
   await page.reload();
   check(!(await page.isVisible("#mdl-intro")), "Beim zweiten Start keine Einführung");
   check(await page.isVisible("#scr-home"), "Startseite sichtbar");
+  check((await page.textContent("#levelsSub")) === "47 Level in 8 Welten", "Startseite nennt 47 Level in 8 Welten");
   check((await page.textContent(".tagline")).includes("Merken"), "Deutsch als Startsprache");
   await page.waitForTimeout(3800);
   await shot(page, "01-home");
@@ -120,7 +133,9 @@ const mockStore = platformId => `
   console.log("Level 1: Strich exakt");
   await page.click('[data-to="levels"]');
   await shot(page, "02-levels");
-  check(await page.locator(".lvl.locked").count() === 29, "29 Level gesperrt");
+  const totalLevels = await page.evaluate(() => LEVELS.length);
+  check(totalLevels === 47, `47 Level (${totalLevels})`);
+  check(await page.locator(".lvl.locked").count() === totalLevels - 1, "Alle Level außer dem ersten gesperrt");
   check(await page.locator(".lvl .pro").count() === 0, "Webfassung: keine Vollversions-Sperren");
   check(await page.isVisible("#scr-levels .lang"), "Flaggen auch auf der Levelübersicht");
   await page.click('#scr-levels [data-lang="en"]');
@@ -171,8 +186,7 @@ const mockStore = platformId => `
   check(await page.isVisible("#scr-levels"), "Abbrechen führt zur Levelübersicht");
 
   console.log("Maßstab: Level 13 (Quadrat doppelt so groß)");
-  await unlockUpTo(page, 12);
-  await page.locator(".lvl").nth(12).click();
+  await openLevel(page, "world3-1");
   /* Links ist die Vorlage halb so groß dargestellt; verlangt ist das Doppelte
      des Sichtbaren, also die Originalgröße im Raum 0..96. */
   await drawOn(page, "cvR", scaled(SH.square, 0.5), { offset: [10, 10] });
@@ -188,8 +202,7 @@ const mockStore = platformId => `
   await page.click("#resActions >> text=Levelübersicht");
 
   console.log("Maßstab: Level 15 (Treppe halb so groß)");
-  await unlockUpTo(page, 14);
-  await page.locator(".lvl").nth(14).click();
+  await openLevel(page, "world3-3");
   await drawOn(page, "cvR", scaled(SH.stairs, 0.5), { offset: [20, 20] });
   await page.click("#btnDone");
   sc = await scoreText(page);
@@ -197,8 +210,7 @@ const mockStore = platformId => `
   await page.click("#resActions >> text=Levelübersicht");
 
   console.log("Gedächtnis: Level 7");
-  await unlockUpTo(page, 6);
-  await page.locator(".lvl").nth(6).click();
+  await openLevel(page, "world2-1");
   check(await page.isVisible("#lookVeil"), "Einprägen-Phase sichtbar");
   await drawOn(page, "cvR", [[[10, 10], [50, 50]]]);
   check(await page.evaluate(() => game.drawn.length) === 0, "Während des Einprägens wird nicht gezeichnet");
@@ -215,19 +227,17 @@ const mockStore = platformId => `
   check(sc >= 90, `Pfeil aus dem Gedächtnis: ${sc} %`);
   await page.click("#resActions >> text=Levelübersicht");
   /* Countdown darf nach dem Verlassen nicht weiterlaufen */
-  await page.locator(".lvl").nth(7).click();
+  await page.locator(".lvl").nth(await levelIndex(page, "world2-2")).click();
   await page.click('#scr-game [data-action="quitGame"]');
   await page.waitForTimeout(6500);
   check(await page.isVisible("#scr-levels"), "Abgebrochener Countdown springt nicht zurück ins Spiel");
   check(await page.evaluate(() => timers.size) === 0, "Keine Zeitgeber übrig");
 
   console.log("Spiegeln und Drehen");
-  await unlockUpTo(page, 24);
   const TR = { mirrorV: p => [96 - p[0], p[1]], rot90: p => [96 - p[1], p[0]], rot180: p => [96 - p[0], 96 - p[1]] };
   const lvlInfo = await page.evaluate(() => LEVELS.map(l => ({ id: l.id, shape: l.shape, transform: l.transform })));
-  const mi = lvlInfo.findIndex(l => l.id === "worldMirror-1");
-  check(mi === 18 && lvlInfo[mi].transform === "mirrorV", "Welt „Spiegeln und Drehen“ beginnt mit Level 19");
-  await page.locator(".lvl").nth(mi).click();
+  const mi = await openLevel(page, "worldMirror-1");
+  check(lvlInfo[mi].transform === "mirrorV", `Welt „Spiegeln und Drehen“ beginnt mit Level ${mi + 1} (senkrecht spiegeln)`);
   check((await page.textContent("#gameTask")).includes("senkrechten Achse"), "Aufgabe nennt die Spiegelachse");
   check((await page.textContent("#gameChips")).includes("spiegeln"), "Regel-Chip für Spiegeln");
   await drawOn(page, "cvR", SH.flag);
@@ -242,8 +252,7 @@ const mockStore = platformId => `
   check(scRight >= 90, `Gespiegelte Fahne: ${scRight} % (≥ 90)`);
   check(scWrong <= 40, `Ungespiegelt abgezeichnet: ${scWrong} % (≤ 40, kein Stern)`);
   await page.click("#resActions >> text=Levelübersicht");
-  const ri = lvlInfo.findIndex(l => l.id === "worldMirror-3");
-  await page.locator(".lvl").nth(ri).click();
+  await openLevel(page, "worldMirror-3");
   check((await page.textContent("#gameTask")).includes("90°"), "Aufgabe nennt die Drehung");
   await drawOn(page, "cvR", SH.arrow.map(s => s.map(TR.rot90)));
   await page.click("#btnDone");
@@ -256,9 +265,49 @@ const mockStore = platformId => `
   check(sc <= 40 && await page.isVisible("#resNote"), `In die falsche Richtung gedreht: ${sc} % (≤ 40) mit Hinweis`);
   await page.click("#resActions >> text=Levelübersicht");
 
+  console.log("Auf Zeit");
+  const ti = await openLevel(page, "worldTimed-1");
+  check(ti === 6, `Welt „Auf Zeit“ folgt direkt auf „Erste Linien“ (Level ${ti + 1})`);
+  check((await page.textContent("#drawTimer")).includes("10 s") && await page.evaluate(() => document.getElementById("drawTimer").classList.contains("waiting")),
+    "Uhr zeigt 10 s und wartet auf den ersten Strich");
+  check((await page.textContent("#gameTask")).includes("10 Sekunden"), "Aufgabe nennt die Zeichenzeit");
+  await page.waitForTimeout(1200);
+  check(await page.evaluate(() => !game.timerStarted), "Hinschauen kostet keine Zeit");
+  await drawOn(page, "cvR", SH.plus);
+  check(await page.evaluate(() => game.timerStarted && !document.getElementById("drawTimer").classList.contains("waiting")), "Uhr läuft ab dem ersten Strich");
+  await shot(page, "06c-timed");
+  await page.click("#btnDone");
+  sc = await scoreText(page);
+  check(sc >= 90 && await page.isHidden("#resNote"), `Plus rechtzeitig fertig: ${sc} %, kein Hinweis`);
+  check(await page.evaluate(() => !game.drawTimerId), "Uhr nach „Fertig“ angehalten");
+  await page.click("#resActions >> text=Levelübersicht");
+
+  console.log("Zeit läuft ab, mitten im Strich");
+  await page.evaluate(() => { free.shape = "square"; free.view = 0; free.drawTime = 5; free.transform = "none"; free.scale = 1; store.set("free", free); });
+  await page.click('#scr-levels [data-action="back"]');
+  await page.click('[data-to="free"]');
+  await page.click('[data-action="startFree"]');
+  const rq = await page.locator("#cvR").boundingBox();
+  await page.mouse.move(rq.x + rq.width * .25, rq.y + rq.height * .25);
+  await page.mouse.down();
+  for (let k = 1; k <= 20; k++) await page.mouse.move(rq.x + rq.width * (.25 + k * .025), rq.y + rq.height * .25);
+  await page.waitForTimeout(5400);   // Maus bleibt gedrückt
+  check(await page.isVisible("#mdl-result"), "Nach 5 s wird automatisch gewertet");
+  check((await page.textContent("#resNote")).includes("Zeit ist um"), "Hinweis: Zeit ist um");
+  check(await page.evaluate(() => game.drawn.length === 1 && game.drawn[0].length >= 2 && game.locked), "Angefangener Strich zählt, weiteres Zeichnen gesperrt");
+  await page.mouse.up();
+  await page.waitForTimeout(150);
+  check(await page.evaluate(() => game.drawn.length === 1), "Loslassen danach ändert nichts");
+  await page.click("#resActions >> text=Andere Figur");
+  check(await page.evaluate(() => timers.size === 0), "Keine Uhr läuft weiter");
+  await page.evaluate(() => { free.drawTime = 0; free.shape = "house"; store.set("free", free); renderFree(); });
+  check(await page.locator('#freeRules .label:has-text("Zeichenzeit")').count() === 1, "Regler „Zeichenzeit“ im freien Spiel");
+  await page.click('#scr-free [data-action="back"]');
+  await page.click('[data-to="levels"]');
+
   console.log("Haus vom Nikolaus");
   const ni = lvlInfo.findIndex(l => l.shape === "nikolaus");
-  await unlockUpTo(page, ni + 1);
+  await unlockUpTo(page, ni + 1);   // auch das Level selbst, für die Wiederholungen
   await page.locator(".lvl").nth(ni).click();
   check((await page.textContent("#gameChips")).includes("in einem Zug"), "Regel-Chip „in einem Zug“");
   await page.click('[data-action="skipLook"]');
@@ -319,6 +368,10 @@ const mockStore = platformId => `
   await page.click('[data-action="startMulti"]');
   check((await page.textContent("#handoffName")) === "Lena", "Erste Spielerin ist Lena");
   await shot(page, "09-handoff");
+  /* Figur festlegen: der Pool wird zufällig gemischt, und bei einfachen
+     Figuren wie Plus kostet Zittern weniger als beim Haus. So misst der Test
+     bei jedem Lauf dasselbe. */
+  await page.evaluate(() => { match.rounds[0].shape = "house"; });
   const target = await page.evaluate(() => resolveShape(match.rounds[0].shape).strokes);
   const quality = [0.4, 2.5, 1.2];       // Zittrigkeit je Person
   for (let p = 0; p < 3; p++) {
@@ -481,7 +534,41 @@ const mockStore = platformId => `
   check(!(await p3.isVisible("#mdl-intro")), "Kein Einführungsdialog über dem Import");
   await ctx3.close();
 
+  console.log("Landeseite für QR-Codes");
+  check(packUrl.startsWith("https://simaehlmann-cloud.github.io/Drawmory/open/#t="), "Geteilte Links führen auf die Landeseite /open/");
+  const OPEN = BASE.replace("index.html", "open/");
+  const ctx6 = await browser.newContext({ viewport: { width: 820, height: 1180 }, locale: "de-DE",
+    userAgent: "Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+  const p6 = await ctx6.newPage();
+  const landingErrors = [];
+  p6.on("pageerror", e => landingErrors.push(e.message));
+  p6.on("console", m => { if (m.type() === "error") landingErrors.push(m.text()); });
+  const packCode = packUrl.split("#t=")[1];
+  await p6.goto(OPEN + "#t=" + packCode);
+  check((await p6.textContent("#title")) === "2 Vorlagen nachzeichnen", "Landeseite: Titel für ein Paket");
+  check(await p6.locator("#previews figure").count() === 2, "Landeseite: zwei Vorschauen");
+  check(await p6.evaluate(() => { const c = document.querySelector("#previews canvas"); const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n > 200; }), "Landeseite: Vorschau ist gezeichnet");
+  check((await p6.getAttribute("#openApp", "href")) === "drawmory://import#t=" + packCode, "„In Drawmory öffnen“ übergibt den Code an die App");
+  check((await p6.getAttribute("#web", "href")) === "../#t=" + packCode, "Browser-Weg behält den Code");
+  check(await p6.isHidden("#store") && await p6.isVisible("#soon"), "Ohne App-Store-ID: Hinweis „bald im App Store“");
+  await shot(p6, "12d-landing");
+  await p6.goto(OPEN + "#t=" + packCode.slice(0, -3) + "xyz");
+  check((await p6.textContent("#sub")).includes("unvollständig"), "Beschädigter Code: verständlicher Hinweis");
+  await p6.goto(OPEN);
+  check((await p6.textContent("#title")) === "Drawmory" && await p6.isHidden("#sub.error"), "Ohne Code: neutrale Seite ohne Fehlermeldung");
+  check(landingErrors.length === 0, "Landeseite ohne Fehler" + (landingErrors.length ? ": " + landingErrors.join(" | ") : ""));
+  await ctx6.close();
+
+  console.log("Link-Empfang in der App (Universal Link und doppelte Zustellung)");
+  await page.evaluate(() => { window.__askCalls = 0; const orig = askImport; window.askImport = (...a) => { window.__askCalls++; return orig(...a); }; });
+  await page.evaluate(u => { window.handleOpenURL(u); window.handleOpenURL(u); }, packUrl);
+  await page.waitForSelector("#mdl-confirm:not([hidden])");
+  check(await page.evaluate(() => window.__askCalls) === 1, "Doppelt zugestellter Link wird nur einmal verarbeitet");
+  check((await page.textContent("#confirmText")).includes("2 Vorlagen"), "https-Link (Universal Link) öffnet die Rückfrage");
+  await page.click('[data-action="confirmNo"]');
+
   console.log("App-Link drawmory://");
+  await page.evaluate(() => { lastOpenedLink = { url: "", at: 0 }; });
   await page.evaluate(u => window.handleOpenURL("drawmory://import#t=" + u.split("#t=")[1]), packUrl);
   await page.waitForSelector("#mdl-confirm:not([hidden])");
   check((await page.textContent("#confirmText")).includes("2 Vorlagen") && await page.isHidden("#confirmExtra"), "App-Link öffnet die Rückfrage, ohne App-Angebot");
@@ -512,9 +599,9 @@ const mockStore = platformId => `
   await page.waitForTimeout(3800);
   await shot(page, "13-home-dark-en");
   await page.click('[data-to="levels"]');
-  await unlockUpTo(page, 16);
+  await unlockUpTo(page, 20);
   await shot(page, "13b-levels-dark");
-  await page.locator(".lvl").nth(16).click();
+  await page.locator(".lvl").nth(await levelIndex(page, "world3-5")).click();
   await page.waitForTimeout(200);
   await shot(page, "14-game-dark");
   await page.click('#scr-game [data-action="quitGame"]');
@@ -571,12 +658,18 @@ const mockStore = platformId => `
   await p4.evaluate(() => document.dispatchEvent(new Event("deviceready")));
   await p4.waitForTimeout(100);
   await p4.click('[data-to="levels"]');
-  check(await p4.locator(".lvl .pro").count() === 20, "20 Level mit Vollversions-Hinweis");
-  await unlockUpTo(p4, 10);
-  await p4.locator(".lvl").nth(10).click();
-  check(await p4.isVisible("#mdl-paywall") && await p4.isHidden("#scr-game"), "Level 11 öffnet den Kaufdialog statt des Spiels");
+  const freeN = await p4.evaluate(() => FREE_LEVELS);
+  check(freeN === 11, "Gratis: Erste Linien und Auf Zeit (11 Level)");
+  check(await p4.locator(".lvl .pro").count() === 47 - freeN, `${47 - freeN} Level mit Vollversions-Hinweis`);
+  await unlockUpTo(p4, freeN);
+  await p4.locator(".lvl").nth(freeN - 1).click();
+  check(await p4.isVisible("#scr-game") && await p4.isHidden("#mdl-paywall"), "Level 11 (Auf Zeit) ist gratis");
+  await p4.click('#scr-game [data-action="quitGame"]');
+  await p4.locator(".lvl").nth(freeN).click();
+  check(await p4.isVisible("#mdl-paywall") && await p4.isHidden("#scr-game"), "Level 12 öffnet den Kaufdialog statt des Spiels");
+  check((await p4.textContent("#payLevelsItem")) === "Alle 47 Level in 8 Welten", "Kaufdialog nennt die echte Levelzahl");
   check((await p4.textContent("#btnBuy")).includes("3,99"), "Preis aus dem Store");
-  check((await p4.textContent("#payReason")).includes("Level 11"), "Grund wird genannt");
+  check((await p4.textContent("#payReason")) === "Level 12 bis 47 gehören zur Vollversion.", "Grund mit richtigen Zahlen");
   await shot(p4, "17-paywall");
   await p4.click('#mdl-paywall [data-action="closeModal"]');
   await p4.click('#scr-levels [data-action="back"]');

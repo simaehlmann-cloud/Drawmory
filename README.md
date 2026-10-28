@@ -9,21 +9,27 @@ offline, ohne Konto, ohne Werbung, ohne Tracking, ohne externe Bibliotheken.
 Android ist vorbereitet.
 
 **Weg in den App Store:** siehe [TESTFLIGHT.md](TESTFLIGHT.md) – Schritt für
-Schritt bis TestFlight, einschließlich In-App-Kauf.
+Schritt bis TestFlight, einschließlich In-App-Kauf und Universal Links.
 
-Version 0.2.1 · versionCode 201 · iOS-Build 201
+Version 0.3.0 · versionCode 300 · iOS-Build 300
 
 ## Funktionen
 
-- **30 Level in 5 Welten:** Erste Linien, Aus dem Gedächtnis, Maßstab,
-  Spiegeln und Drehen, Profi. Ein Level schaltet das nächste ab einem Stern (55 %) frei.
+- **47 Level in 8 Welten:** Erste Linien, Auf Zeit, Aus dem Gedächtnis, Maßstab,
+  Spiegeln und Drehen, Profi, Meisterstücke, Alles zusammen. Ein Level schaltet
+  das nächste ab einem Stern (55 %) frei. Fortschritt hängt an festen Level-IDs,
+  neue Welten verschieben ihn nicht; einmal gespielte Level bleiben offen.
+- **Zeichenzeit:** 10, 7 oder 5 Sekunden ab dem ersten Strich. Hinschauen kostet
+  keine Zeit. Läuft die Uhr ab, wird der angefangene Strich abgeschlossen und
+  sofort gewertet. Als Regler im freien Spiel und im Mehrspieler-Modus, als
+  eigene Welt „Auf Zeit“ mit fünf einfachen Figuren.
 - **Spiegeln und Drehen:** an senkrechter oder waagerechter Achse, 90° und 180°.
   Wer die Figur nur abzeichnet oder falsch herum dreht, bekommt höchstens 40 %
   und einen Hinweis – die App vergleicht dazu mit allen falschen Lagen.
 - **Fehlerfarben im Ergebnis:** die eigene Linie grün (trifft), gelb (knapp), rot (daneben).
 - **Haus vom Nikolaus** zählt nur in einem Zug; versehentliche Tupfer werden ignoriert.
 - **Einführung** in drei Schritten beim ersten Start, später unter „Über das Spiel“.
-- **Regler:** Sichtzeit (dauerhaft, 8, 5, 3, 2 s), Größe (gleich, doppelt, halb),
+- **Regler:** Sichtzeit (dauerhaft, 8, 5, 3, 2 s), Zeichenzeit (unbegrenzt, 10, 7, 5 s), Größe (gleich, doppelt, halb),
   Verwandeln (spiegeln, drehen), Raster links und rechts getrennt, Lineal-Hilfe.
 - **Maßstab richtig gedacht:** Bei „doppelt so groß“ zeigt die Vorlage links ein
   feineres Raster. Wer Kästchen zählt, kommt auf die richtige Größe.
@@ -32,7 +38,7 @@ Version 0.2.1 · versionCode 201 · iOS-Build 201
 - **Eigene Vorlagen:** Editor mit Linien (Einrasten auf halben Kästchen) und
   Freihand (wird geglättet). Teilen per QR-Code, Link oder Bild, auch als
   **Paket mit bis zu 20 Vorlagen** in einem QR-Code.
-- **Vollversion per In-App-Kauf:** gratis sind Level 1–10, Mehrspieler zu zweit,
+- **Vollversion per In-App-Kauf (1,99 €):** gratis sind die Welten „Erste Linien“ und „Auf Zeit“ (Level 1–11), Mehrspieler zu zweit,
   freies Spiel sowie Import und Spielen geteilter Vorlagen. Die Webfassung
   (Ziel der QR-Codes) bleibt vollständig frei.
 - **DE/EN** mit Flaggen-Umschalter, hell/dunkel/automatisch, Töne abschaltbar.
@@ -67,19 +73,33 @@ Die Stellschrauben stehen in `SCORE` (index.html, Abschnitt 8).
 
 Format v1 (eine Vorlage) und v2 (Paket mit 2–20 Vorlagen), Base64url:
 Version, Name (UTF-8), Striche mit Punkten als je ein Byte (0..96), Prüfsumme.
-Ein Haus braucht unter 40 Byte. Der Link lautet `SHARE_BASE#t=<code>` – der Teil
-hinter `#` geht nie an einen Server. In der App öffnet `drawmory://import#t=<code>`
-denselben Import; die Webfassung bietet diesen Link auf iPhone und iPad an.
+Ein Haus braucht unter 40 Byte. Der Link lautet `SHARE_BASE#t=<code>` mit
+`SHARE_BASE = https://simaehlmann-cloud.github.io/Drawmory/open/` – der Teil
+hinter `#` geht nie an einen Server.
 
-**Wichtig vor der Veröffentlichung:** `SHARE_BASE` in index.html zeigt auf
-`https://simaehlmann-cloud.github.io/Drawmory/`. Dafür das Repo `Drawmory` mit
-GitHub Pages (Branch `main`, Ordner `/`) anlegen. Scannt jemand den QR-Code mit
-der iPad-Kamera, öffnet sich diese Webfassung und übernimmt die Vorlage. Damit
-ein gescannter Link ganz ohne Umweg die installierte App öffnet, wären Universal
-Links nötig. Das verlangt eine eigene Domain mit `apple-app-site-association` im
-Wurzelverzeichnis (bei GitHub Pages nur über ein Repo `simaehlmann-cloud.github.io`
-oder eine eigene Domain) und die Fähigkeit „Associated Domains“ im Provisioning-Profil.
-Bis dahin übernimmt der Knopf „In der App öffnen“ diesen Schritt.
+So kommt ein gescannter QR-Code an:
+
+| Lage | Was passiert |
+|---|---|
+| Drawmory installiert | iOS öffnet den Link als **Universal Link** direkt in der App, Rückfrage „hinzufügen?“ |
+| App fehlt | Landeseite `open/` mit Vorschau, „In Drawmory öffnen“ (`drawmory://`) und – sobald `APP_STORE_ID` gesetzt ist – „Im App Store laden“ |
+| Links aus 0.2 (`/Drawmory/#t=…`) | gelten weiter, ebenfalls als Universal Link |
+
+Bausteine der Universal Links:
+
+- `cordova-plugins/drawmory-links/` – eigenes Plugin. cordova-ios 8 (UIScene)
+  meldet Universal Links nicht an JavaScript und startet Plugins erst nach dem
+  Szenenaufbau; das Plugin reicht Warm- und Kaltstart-Links an `handleOpenURL`
+  weiter und trägt `applinks:simaehlmann-cloud.github.io` für Release-Builds ein.
+- `universal-links/` – Inhalt des Repos `simaehlmann-cloud.github.io` mit der
+  Freigabe `.well-known/apple-app-site-association`. Gilt nur für
+  `/Drawmory/open/*` und `/Drawmory/#t=*` – Datenschutz und Impressum öffnen
+  weiter im Browser.
+- `validate.js` gleicht Domain, Plugin, Freigabe und Landeseite ab und prüft an
+  300 Codes, dass Landeseite und App dasselbe lesen.
+
+Eine eigene Domain (etwa drawmory.de) ließe sich später einsetzen:
+`SHARE_BASE`, `LINK_HOST` (config.xml, ios.yml) und die Freigabedatei ändern.
 
 ## Dateistruktur
 
@@ -94,6 +114,9 @@ icon*.png                   PWA- und Store-Icons
 res/ios/                    iOS-Icons (ohne Alphakanal), Startbild, PrivacyInfo.xcprivacy
 res/android/                adaptive Android-Icons je Dichte und colors.xml
 make-icons.py               erzeugt alle Icons neu (läuft auch in den Workflows)
+open/index.html             Landeseite für QR-Codes und geteilte Links
+cordova-plugins/drawmory-links/  Plugin: Universal Links an die App weiterreichen
+universal-links/            Inhalt für das Repo simaehlmann-cloud.github.io (Apple-Freigabe)
 validate.js                 statische Prüfung, gleicht auch die Workflows mit der App ab
 smoketest.js                Ablauftest im echten Browser
 package.json                Prüfwerkzeuge (Playwright, jsQR, pngjs) – nur für Tests
@@ -118,11 +141,12 @@ hochgeladene Build-Nummer dauerhaft belegt ist. `validate.js` prüft das.
 node validate.js        # Syntax, DE/EN vollständig, IDs, Aktionen, Manifest, Icons, Versionen
 npm install && npx playwright install chromium
 python3 -m http.server 8765 &
-node smoketest.js       # 139 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
-                        # Spiegeln/Drehen, Nikolaus, Gedächtnis, Mehrspieler, Editor,
-                        # QR-Rücklesen, Pakete, Link- und App-Import, Vollversion
-                        # (nachgebildetes StoreKit und Google Play), Einführung,
-                        # DE/EN, Hochformat
+node smoketest.js       # 169 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
+                        # Spiegeln/Drehen, Zeichenzeit (auch Ablauf mitten im Strich),
+                        # Nikolaus, Gedächtnis, Mehrspieler, Editor, QR-Rücklesen,
+                        # Pakete, Landeseite, Universal-Link-Empfang, App-Import,
+                        # Vollversion (nachgebildetes StoreKit und Google Play),
+                        # Einführung, DE/EN, Hochformat
 ```
 
 ## Version anheben
@@ -130,32 +154,30 @@ node smoketest.js       # 139 Prüfungen: Level, Bewertung, Fehlerfarben, Maßst
 Drei Stellen müssen gleich sein, `validate.js` prüft das:
 `APP_VERSION` in index.html, `version` in config.xml, `CACHE` in sw.js – plus diese README.
 
-## Update einspielen (0.2.0 → 0.2.1)
+## Update einspielen (0.2.1 → 0.3.0)
 
-Nur diese Dateien ins Repo hochladen, vorhandene werden überschrieben:
+Nur diese Dateien ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
 
 ```
-.github/workflows/ios.yml          neu
-.github/workflows/android.yml      neu
-.gitignore                         neu
-package.json                       neu
-TESTFLIGHT.md                      neu
-res/ios/PrivacyInfo.xcprivacy      neu
-res/android/  (12 PNG + colors.xml) neu
-index.html        Kauf auch über Google Play (Android), Version 0.2.1
-config.xml        Version 0.2.1 / Build 201, adaptive Android-Icons
-sw.js             Cache-Name 0.2.1
-datenschutz.html, datenschutz-en.html   Kauf über Apple bzw. Google
-make-icons.py     erzeugt zusätzlich die Android-Icons
-validate.js       gleicht Workflows, Produkt-ID, URL-Schema, Privacy-Manifest ab
-smoketest.js      prüft den Kauf auch unter Android
-README.md
+cordova-plugins/drawmory-links/   neu   Plugin für Universal Links (3 Dateien)
+open/index.html                   neu   Landeseite für QR-Codes
+universal-links/                  neu   Vorlage für das Freigabe-Repo (4 Dateien)
+index.html        Zeichenzeit, 3 neue Welten, 8 neue Figuren, QR-Ziel /open/, Version 0.3.0
+config.xml        Version 0.3.0 / Build 300, Plugin drawmory-links
+sw.js             Cache-Name 0.3.0, Landeseite offline verfügbar
+.github/workflows/ios.yml   prüft Plugin, Associated Domains, Profil und Freigabe
+datenschutz.html, datenschutz-en.html   Abschnitt zu Universal Links
+validate.js, smoketest.js   neue Prüfungen
+README.md, TESTFLIGHT.md
 ```
+
+Zusätzlich einmalig ein **zweites Repo** `simaehlmann-cloud.github.io` mit dem
+Inhalt von `universal-links/` (TESTFLIGHT.md, „Universal Links einrichten“).
 
 Auf der GitHub-Webseite: ZIP entpacken, im Repo „Add file → Upload files“,
-**den Inhalt** des entpackten Ordners hineinziehen (die Ordner `.github` und
-`res` mit), „Commit changes“. Achtung: Ordner, die mit einem Punkt beginnen
-(`.github`), blendet macOS im Finder aus – mit Cmd+Shift+Punkt einblenden.
+**den Inhalt** des entpackten Ordners hineinziehen, „Commit changes“. Ordner,
+die mit einem Punkt beginnen (`.github`, `.well-known`), blendet macOS im Finder
+aus – mit Cmd+Shift+Punkt einblenden.
 
 ## In-App-Kauf einrichten
 
@@ -173,7 +195,7 @@ Ausführlich in [TESTFLIGHT.md](TESTFLIGHT.md), Schritte 6 und 7. Kurz:
 ## Offen für die Store-Fassung
 
 - Paketkennung `de.drawmory.app` bestätigen (nach Veröffentlichung unveränderlich)
-- Universal Links (siehe oben), sobald eine eigene Domain feststeht
+- Nach der Veröffentlichung `APP_STORE_ID` in `open/index.html` eintragen
 - Store-Screenshots und App-Store-Texte (Name „Drawmory“, Untertitel
   „Look, remember, redraw“ / „Anschauen, merken, nachzeichnen“)
 - Datenschutz- und Impressumsseite zusätzlich öffentlich erreichbar machen

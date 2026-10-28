@@ -1,0 +1,15 @@
+{
+  "name": "drawmory-links",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Universal Links und App-Links an handleOpenURL weiterreichen (cordova-ios 8, UIScene)",
+  "cordova": {
+    "id": "drawmory-links",
+    "platforms": ["ios"]
+  },
+  "engines": {
+    "cordovaDependencies": {
+      "1.0.0": { "cordova-ios": ">=8.0.0" }
+    }
+  }
+}
