@@ -52,6 +52,9 @@ jobs:
       APP_ID: de.drawmory.app
       APP_NAME: Drawmory
       URL_SCHEME: drawmory
+      # Domain der Universal Links (QR-Codes). Muss zu SHARE_BASE in index.html
+      # und zu LINK_HOST in der config.xml passen – validate.js gleicht das ab.
+      LINK_HOST: simaehlmann-cloud.github.io
       CORDOVA_CLI: '13.0.0'
       CORDOVA_IOS: '8.1.1'
 
@@ -191,6 +194,20 @@ jobs:
             echo "::warning::StoreKit.framework nicht in der Projektdatei gefunden – im Build-Protokoll prüfen."
           fi
 
+          # Universal Links: Plugin installiert und Freigabe im Release-Build.
+          # Ohne beides öffnet ein gescannter QR-Code nur die Landeseite.
+          if cordova plugin ls | grep -q '^drawmory-links'; then
+            echo "Universal Links:  Plugin drawmory-links installiert"
+          else
+            echo "::error::Plugin drawmory-links ist nicht installiert (config.xml, cordova-plugins/)."; FEHLER=1
+          fi
+          ENT=$(find platforms/ios -name 'Entitlements-Release.plist' -not -path '*/Plugins/*' | head -1)
+          if [ -n "$ENT" ] && /usr/libexec/PlistBuddy -c 'Print :com.apple.developer.associated-domains' "$ENT" 2>/dev/null | grep -q "applinks:$LINK_HOST"; then
+            echo "Associated Domains: applinks:$LINK_HOST (Release)"
+          else
+            echo "::error::applinks:$LINK_HOST fehlt in ${ENT:-Entitlements-Release.plist}."; FEHLER=1
+          fi
+
           # cordova-ios 8 legt ein eigenes PrivacyInfo.xcprivacy mit leerem
           # NSPrivacyAccessedAPITypes an. Unseres nennt den Grund CA92.1 und
           # ersetzt es an Ort und Stelle (zwei Manifeste wären mehrdeutig).
@@ -263,6 +280,17 @@ jobs:
             *) echo "::error::Das Profil gehört zu '$PROFIL_APP', nicht zu $APP_ID. Für Drawmory ein eigenes App-Store-Profil anlegen."; exit 1 ;;
           esac
 
+          # Seit 0.3 trägt die App die Fähigkeit "Associated Domains". Ein
+          # Profil, das vor dem Einschalten dieser Fähigkeit erzeugt wurde,
+          # enthält sie nicht – das Signieren scheitert dann mit einer langen,
+          # schwer lesbaren Xcode-Meldung. Deshalb hier vorher und klar.
+          if /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' /dev/stdin <<< "$PROFIL_PLIST" > /dev/null 2>&1; then
+            echo "Profil erlaubt Associated Domains."
+          else
+            echo "::error::Das Profil erlaubt keine Associated Domains. developer.apple.com → Identifiers → de.drawmory.app → 'Associated Domains' anhaken und speichern → Profiles → 'Drawmory App Store' → Edit → Save → neu herunterladen → Secret IOS_PROVISIONING_PROFILE ersetzen."
+            exit 1
+          fi
+
           BUND="$RUNNER_TEMP/signieren.keychain-db"
           BUND_PW=$(uuidgen)
           security create-keychain -p "$BUND_PW" "$BUND"
@@ -307,6 +335,55 @@ jobs:
           JSON
           cordova build ios --release --device
           rm -f build.json
+
+          # Gegenprobe am fertigen Paket: Die signierte App muss die
+          # Domain-Freigabe tragen, sonst öffnen QR-Codes nur die Landeseite.
+          IPA=$(find platforms/ios/build -name '*.ipa' | head -1)
+          [ -n "$IPA" ] || { echo "::error::Keine IPA gefunden."; exit 1; }
+          PRUEF="$RUNNER_TEMP/ipa-pruefung"
+          rm -rf "$PRUEF" && mkdir -p "$PRUEF"
+          unzip -q "$IPA" -d "$PRUEF"
+          APPDIR=$(find "$PRUEF/Payload" -maxdepth 1 -name '*.app' | head -1)
+          if codesign -d --entitlements - "$APPDIR" 2>/dev/null | grep -q "applinks:$LINK_HOST"; then
+            echo "Signierte App trägt applinks:$LINK_HOST."
+          else
+            echo "::error::Die signierte App trägt applinks:$LINK_HOST nicht."
+            codesign -d --entitlements - "$APPDIR" 2>&1 | sed -n '1,40p'
+            exit 1
+          fi
+          rm -rf "$PRUEF"
+
+      # Die Freigabedatei liegt in einem anderen Repo (simaehlmann-cloud.github.io).
+      # iOS lädt sie beim Installieren der App über Apples Zwischenspeicher.
+      # Fehlt sie oder nennt sie die falsche Team-ID, baut und lädt der
+      # Workflow trotzdem hoch – nur öffnen QR-Codes dann die Landeseite
+      # statt der App. Deshalb Hinweis statt Abbruch.
+      - name: Universal-Link-Freigabe auf der Domain prüfen
+        if: steps.signieren.outputs.vorhanden == 'true'
+        env:
+          TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+        run: |
+          URL="https://$LINK_HOST/.well-known/apple-app-site-association"
+          INHALT=$(curl -fsSL --max-time 20 "$URL" || true)
+          if [ -z "$INHALT" ]; then
+            echo "::warning::$URL ist nicht erreichbar. Repo simaehlmann-cloud.github.io mit universal-links/ anlegen (TESTFLIGHT.md, Abschnitt Universal Links)."
+            exit 0
+          fi
+          if printf '%s' "$INHALT" | grep -q "$TEAM_ID.$APP_ID"; then
+            echo "Freigabe auf $LINK_HOST nennt $TEAM_ID.$APP_ID."
+          else
+            echo "::warning::$URL nennt $TEAM_ID.$APP_ID nicht. 'DEINE_TEAM_ID' in der Datei durch die Team-ID ersetzen."
+          fi
+          printf '%s' "$INHALT" | grep -q '/Drawmory/open/' \
+            || echo "::warning::$URL enthält den Pfad /Drawmory/open/* nicht."
+          # Apples Zwischenspeicher: Das ist die Fassung, die Geräte tatsächlich
+          # sehen. Er aktualisiert sich mit Verzögerung (bis etwa 24 Stunden).
+          CDN=$(curl -fsSL --max-time 20 "https://app-site-association.cdn-apple.com/a/v1/$LINK_HOST" || true)
+          if printf '%s' "$CDN" | grep -q "$TEAM_ID.$APP_ID"; then
+            echo "Apples Zwischenspeicher kennt die Freigabe bereits."
+          else
+            echo "::notice::Apples Zwischenspeicher kennt die Freigabe noch nicht. Nach dem ersten Hochladen der Datei kann das einige Stunden dauern; bis dahin öffnen QR-Codes die Landeseite."
+          fi
 
       - name: IPA hochladen
         if: steps.signieren.outputs.vorhanden == 'true'
