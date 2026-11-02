@@ -2,9 +2,9 @@
 <!-- Paketkennung: nach der ersten Veröffentlichung unveränderlich.
      Vor dem Anlegen in App Store Connect bewusst festlegen. -->
 <widget id="de.drawmory.app"
-        version="0.3.0"
-        android-versionCode="300"
-        ios-CFBundleVersion="300"
+        version="1.0.0"
+        android-versionCode="1000"
+        ios-CFBundleVersion="1000"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
 

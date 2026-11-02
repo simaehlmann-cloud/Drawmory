@@ -11,7 +11,7 @@ Android ist vorbereitet.
 **Weg in den App Store:** siehe [TESTFLIGHT.md](TESTFLIGHT.md) – Schritt für
 Schritt bis TestFlight, einschließlich In-App-Kauf und Universal Links.
 
-Version 0.3.0 · versionCode 300 · iOS-Build 300
+Version 1.0.0 · versionCode 1000 · iOS-Build 1000
 
 ## Funktionen
 
@@ -154,25 +154,20 @@ node smoketest.js       # 169 Prüfungen: Level, Bewertung, Fehlerfarben, Maßst
 Drei Stellen müssen gleich sein, `validate.js` prüft das:
 `APP_VERSION` in index.html, `version` in config.xml, `CACHE` in sw.js – plus diese README.
 
-## Update einspielen (0.2.1 → 0.3.0)
+## Update einspielen (0.3.0 → 1.0.0, Store-Fassung)
 
-Nur diese Dateien ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
+Nur die Versionsnummer ändert sich, der Inhalt der App bleibt gleich.
+Diese Dateien ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
 
 ```
-cordova-plugins/drawmory-links/   neu   Plugin für Universal Links (3 Dateien)
-open/index.html                   neu   Landeseite für QR-Codes
-universal-links/                  neu   Vorlage für das Freigabe-Repo (4 Dateien)
-index.html        Zeichenzeit, 3 neue Welten, 8 neue Figuren, QR-Ziel /open/, Version 0.3.0
-config.xml        Version 0.3.0 / Build 300, Plugin drawmory-links
-sw.js             Cache-Name 0.3.0, Landeseite offline verfügbar
-.github/workflows/ios.yml   prüft Plugin, Associated Domains, Profil und Freigabe
-datenschutz.html, datenschutz-en.html   Abschnitt zu Universal Links
-validate.js, smoketest.js   neue Prüfungen
+index.html        APP_VERSION 1.0.0
+config.xml        Version 1.0.0, iOS-Build 1000, Android-versionCode 1000
+sw.js             Cache-Name drawmory-1.0.0 (Webfassung lädt neu)
 README.md, TESTFLIGHT.md
 ```
 
-Zusätzlich einmalig ein **zweites Repo** `simaehlmann-cloud.github.io` mit dem
-Inhalt von `universal-links/` (TESTFLIGHT.md, „Universal Links einrichten“).
+Die Build-Nummer folgt der Version (0.3.0 → 300, 1.0.0 → 1000). So bleibt
+sie größer als jede Nummer, die für 0.3 schon hochgeladen wurde.
 
 Auf der GitHub-Webseite: ZIP entpacken, im Repo „Add file → Upload files“,
 **den Inhalt** des entpackten Ordners hineinziehen, „Commit changes“. Ordner,

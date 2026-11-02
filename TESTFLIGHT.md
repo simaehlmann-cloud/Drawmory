@@ -1,6 +1,6 @@
 # Drawmory nach TestFlight bringen – mit In-App-Kauf und Universal Links
 
-Stand: Version 0.3.0, iOS-Build 300. Der Weg folgt FairMix. Was du dort schon
+Stand: Version 1.0.0, iOS-Build 1000. Der Weg folgt FairMix. Was du dort schon
 hast, nutzt du weiter; neu sind nur die Teile, die an der Kennung
 `de.drawmory.app` hängen.
 
@@ -126,7 +126,7 @@ Repo → **Actions → Build Drawmory (iOS) → Run workflow** (Branch `main`).
 
 - Erst laufen auf Linux die Prüfungen (Prüfer und 169 Abläufe im Browser).
 - Dann baut ein Mac die App. Im Schritt **„Erzeugtes Projekt bestätigen“**
-  stehen Kennung, Version 0.3.0, Build 300, URL-Schema, In-App-Kauf-Plugin,
+  stehen Kennung, Version 1.0.0, Build 1000, URL-Schema, In-App-Kauf-Plugin,
   Universal-Link-Plugin, Associated Domains und Privacy-Manifest. Jeder Fehler
   dort bricht ab, bevor eine Build-Nummer verbraucht ist.
 - Hochgeladen wird **nur bei „Run workflow“**, nicht bei jedem Push.
@@ -195,7 +195,7 @@ Domains“ ab – bevor eine Build-Nummer verbraucht ist.
 1. **Run workflow** wie in Schritt 8. Der Schritt **„Universal-Link-Freigabe
    auf der Domain prüfen“** meldet, ob die Datei aus A erreichbar ist und die
    richtige Team-ID nennt.
-2. Auf dem iPad **Drawmory löschen** und Build 300 aus TestFlight neu
+2. Auf dem iPad **Drawmory löschen** und den aktuellen Build aus TestFlight neu
    installieren. Nur bei der Installation holt iOS die Freigabe ab.
 
 ### D. Testen
@@ -235,7 +235,7 @@ The app is in German and English; the language can be switched with the flags in
 ## Nächster Upload
 
 Jede hochgeladene Build-Nummer ist dauerhaft belegt. Vor dem nächsten
-„Run workflow“ in der `config.xml` `ios-CFBundleVersion` erhöhen (301, 302, …).
+„Run workflow“ in der `config.xml` `ios-CFBundleVersion` erhöhen (1001, 1002, …).
 Ändert sich der Inhalt der App, zusätzlich die Version an den Stellen
 anheben, die `validate.js` vergleicht.
 
