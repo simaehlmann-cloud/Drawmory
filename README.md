@@ -33,7 +33,7 @@ Version 1.0.0 · versionCode 1000 · iOS-Build 1000
   Verwandeln (spiegeln, drehen), Raster links und rechts getrennt, Lineal-Hilfe.
 - **Maßstab richtig gedacht:** Bei „doppelt so groß“ zeigt die Vorlage links ein
   feineres Raster. Wer Kästchen zählt, kommt auf die richtige Größe.
-- **Mehrspieler:** 2 bis 4 Personen an einem iPad, 1/3/5 Runden, Übergabe-Bildschirm
+- **Mehrspieler:** 2 bis 4 Personen an einem Gerät, 1/3/5 Runden, Übergabe-Bildschirm
   zwischen den Zügen, Siegerehrung mit allen Zeichnungen im Vergleich.
 - **Eigene Vorlagen:** Editor mit Linien (Einrasten auf halben Kästchen) und
   Freihand (wird geglättet). Teilen per QR-Code, Link oder Bild, auch als
@@ -156,11 +156,13 @@ Drei Stellen müssen gleich sein, `validate.js` prüft das:
 
 ## Update einspielen (0.3.0 → 1.0.0, Store-Fassung)
 
-Nur die Versionsnummer ändert sich, der Inhalt der App bleibt gleich.
+Versionsnummer für den Store plus Feinschliff fürs iPhone.
 Diese Dateien ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
 
 ```
-index.html        APP_VERSION 1.0.0
+index.html        APP_VERSION 1.0.0; „Gerät“ statt „iPad“ (Startseite, Übergabe);
+                  schmale Bildschirme: Regel-Chips in eigener Zeile unter dem Titel,
+                  Ergebnis kompakt, Knöpfe ohne Scrollen erreichbar
 config.xml        Version 1.0.0, iOS-Build 1000, Android-versionCode 1000
 sw.js             Cache-Name drawmory-1.0.0 (Webfassung lädt neu)
 README.md, TESTFLIGHT.md
