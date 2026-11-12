@@ -6,7 +6,8 @@
    Mehrspieler, Editor, QR-Code (mit unabhängigem Decoder zurückgelesen),
    Import per Link, Sprachwechsel, Hochformat, Dunkelmodus.
    Ab 0.2: Einführung, Fehlerfarben, Spiegeln und Drehen, Haus vom Nikolaus,
-   Vorlagen-Pakete, App-Links, Vollversion mit nachgebildetem StoreKit. */
+   Vorlagen-Pakete, App-Links, Vollversion mit nachgebildetem StoreKit.
+   Ab Build 1002: Tagesaufgabe, Mein Lernstand, Zeichnung abspielen. */
 "use strict";
 const { chromium } = require("playwright");
 const jsQR = require("jsqr");
@@ -99,6 +100,7 @@ const mockStore = platformId => `
       store: { register(list) { window.__registered = list; }, when() { return when; }, error() {},
         initialize(pl) { window.__initialized = pl; setTimeout(() => L.productUpdated(product), 10); return Promise.resolve([]); },
         get() { return product; }, owned() { return product.owned; }, restorePurchases() { return Promise.resolve(); } } };
+    window.__mockProduct = product;
   })();`;
 
 (async () => {
@@ -641,11 +643,98 @@ const mockStore = platformId => `
   await page.click("text=Zurück zur App");
   check(await page.isVisible("#scr-home"), "Zurück in der App");
 
+  console.log("Tagesaufgabe (ab Build 1002)");
+  const dailyCheck = await page.evaluate(() => {
+    const out = { bad: [], skills: new Set(), sameSkillInRow: 0, stable: true };
+    const d = new Date(2026, 0, 1);
+    let prev = null;
+    for (let i = 0; i < 730; i++) {
+      const key = dayKey(d), task = dailyTask(key);
+      if (JSON.stringify(dailyTask(key)) !== JSON.stringify(task)) out.stable = false;
+      if (!SHAPES[task.shape]) out.bad.push(key + " Figur");
+      if (task.settings.transform !== "none" &&
+          JSON.stringify(transformStrokes(SHAPES[task.shape], task.settings.transform)) === JSON.stringify(SHAPES[task.shape])) out.bad.push(key + " Verwandlung ohne Wirkung");
+      if (task.skill === "scale" && task.settings.scale === 1) out.bad.push(key + " Maßstab 1");
+      if (!skillsOf(task.settings).includes(task.skill)) out.bad.push(key + " Fähigkeit passt nicht zu den Regeln");
+      out.skills.add(task.skill);
+      if (prev === task.skill) out.sameSkillInRow++;
+      prev = task.skill;
+      d.setDate(d.getDate() + 1);
+    }
+    out.skills = out.skills.size;
+    return out;
+  });
+  check(dailyCheck.bad.length === 0, "Zwei Jahre Tagesaufgaben gültig" + (dailyCheck.bad.length ? ": " + dailyCheck.bad.slice(0, 3).join(", ") : ""));
+  check(dailyCheck.stable, "Dieselbe Aufgabe für dasselbe Datum");
+  check(dailyCheck.skills === 5, "Alle fünf Fähigkeiten kommen vor");
+  check(dailyCheck.sameSkillInRow === 0, "Fähigkeit wechselt jeden Tag");
+  check(/^Heute: /.test(await page.textContent("#dailySub")), "Startseite nennt die heutige Aufgabe");
+  await page.click('[data-action="startDaily"]');
+  check(await page.isVisible("#scr-game"), "Tagesaufgabe startet");
+  check((await page.textContent("#gameTitle")).startsWith("Tagesaufgabe"), "Titel zeigt Tagesaufgabe");
+  const dTarget = await page.evaluate(() => {
+    const st = game.round.settings, { kR } = scaleFactors(st.scale);
+    return { view: st.view, strokes: transformStrokes(game.round.strokes, st.transform).map(s => s.map(p => [p[0] * kR, p[1] * kR])) };
+  });
+  if (dTarget.view > 0) await page.click('[data-action="skipLook"]');
+  await drawOn(page, "cvR", dTarget.strokes);
+  if (await page.isEnabled("#btnDone")) await page.click("#btnDone");
+  const dScore = await scoreText(page);
+  check(dScore >= 85, `Exakt gezeichnete Tagesaufgabe: ${dScore} %`);
+  check(await page.evaluate(() => { const r = getDaily()[dayKey()]; return !!r && r.n === 1 && typeof r.s === "number"; }), "Ergebnis für heute gespeichert");
+  await shot(page, "40-daily-result");
+
+  console.log("Zeichnung abspielen");
+  await page.click("#btnReplay");
+  check(await page.isDisabled("#btnReplay"), "Knopf gesperrt, solange abgespielt wird");
+  await page.waitForTimeout(700);
+  await shot(page, "41-replay");
+  const inked = await page.evaluate(() => {
+    const cv = document.getElementById("cvResult"), d = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+    let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+    return n;
+  });
+  check(inked > 200, "Wiedergabe zeichnet auf die Ergebnisfläche");
+  await page.waitForFunction(() => !document.getElementById("btnReplay").disabled, null, { timeout: 9000 });
+  check(true, "Knopf nach der Wiedergabe wieder frei");
+
+  console.log("Mein Lernstand");
+  await page.click('#resActions button:has-text("Mein Lernstand")');
+  check(await page.isVisible("#mdl-stats"), "Lernstand öffnet aus dem Ergebnis");
+  check(await page.isVisible("#scr-home"), "Dahinter die Startseite");
+  check((await page.$$("#statsSkills .skill-row")).length === 5, "Fünf Fähigkeiten");
+  const todaySkill = await page.evaluate(() => dailyTask(dayKey()).skill);
+  check(await page.evaluate(k => skillStats()[k].n >= 1, todaySkill), "Tagesaufgabe zählt für ihre Fähigkeit");
+  await shot(page, "42-stats");
+  await page.click('#mdl-stats [data-action="closeModal"]');
+  check((await page.textContent("#dailySub")).startsWith("Heute geschafft"), "Startseite meldet die erledigte Aufgabe");
+  await page.evaluate(() => {
+    const all = getDaily(), d = new Date();
+    for (let i = 1; i <= 2; i++) { d.setDate(d.getDate() - 1); all[dayKey(d)] = { s: 70, k: "copy", n: 1 }; }
+    store.set("daily", all); renderHome();
+  });
+  check((await page.textContent("#dailyStreak")) === "3 Tage in Folge", "Serie über drei Tage");
+  await page.click('[data-action="openStats"]');
+  check((await page.textContent("#statsTiles")).includes("3 Tage in Folge"), "Lernstand zeigt die Serie");
+  await page.evaluate(() => {
+    /* schwaches Feld erzeugen: zwei Spiegel-Level mit wenig Punkten */
+    const p = getProgress(); LEVELS.filter(l => l.transform !== "none").slice(0, 2).forEach(l => { p[l.id] = 20; });
+    LEVELS.filter(l => l.transform === "none" && !l.drawTime && l.view === 0 && l.scale === 1).slice(0, 2).forEach(l => { p[l.id] = 95; });
+    store.set("progress", p); renderStats();
+  });
+  check(await page.isVisible("#statsTip"), "Übungstipp für das schwächste Feld");
+  check((await page.textContent("#statsTip")).includes("Spiegeln"), "Tipp nennt Spiegeln und Drehen");
+  await page.evaluate(() => setLanguage("en"));
+  check((await page.textContent("#statsTitle")) === "My progress", "Lernstand wechselt die Sprache");
+  await page.evaluate(() => setLanguage("de"));
+  await page.click('#mdl-stats [data-action="closeModal"]');
+
   console.log("Fortschritt zurücksetzen");
   await page.click('[data-action="openSettings"]');
   await page.click('[data-action="resetProgress"]');
   await page.click("#confirmYes");
   check(await page.evaluate(() => Object.keys(getProgress()).length === 0), "Fortschritt gelöscht");
+  check(await page.evaluate(() => Object.keys(getDaily()).length === 0), "Tagesaufgaben gelöscht");
   check(await page.evaluate(() => getTemplates().length === 2), "Vorlagen bleiben erhalten");
 
   console.log("Vollversion (App, nachgebildetes StoreKit)");
@@ -716,6 +805,53 @@ const mockStore = platformId => `
   await p5.waitForTimeout(250);
   check(await p5.evaluate(() => isFull()), "Kauf unter Android schaltet frei");
   await ctx5.close();
+
+  console.log("Android-Handy (360 dp): Wiederherstellen, Zurücktaste, Werkzeugleiste");
+  const ctx7 = await browser.newContext({ viewport: { width: 360, height: 740 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "de-DE" });
+  await ctx7.addInitScript(mockStore("android") + ";navigator.app = { exitApp() { window.__exited = (window.__exited || 0) + 1; } };");
+  const p7 = await ctx7.newPage();
+  p7.on("pageerror", e => errors.push("Android-Handy: " + e.message));
+  await p7.goto(BASE);
+  await p7.evaluate(() => document.dispatchEvent(new Event("deviceready")));
+  await p7.waitForTimeout(100);
+  const back = () => p7.evaluate(() => document.dispatchEvent(new Event("backbutton")));
+  await back();
+  check(!(await p7.isVisible("#mdl-intro")), "Zurück schließt die Einführung");
+  await p7.click('[data-to="templates"]');
+  await p7.click('[data-action="newTemplate"]');
+  await p7.click("#btnRestore");
+  await p7.waitForTimeout(100);
+  check((await p7.textContent("#payMsg")) === "Kein früherer Kauf gefunden.", "Wiederherstellen ohne Kauf meldet das");
+  check(!(await p7.evaluate(() => isFull())), "Wiederherstellen ohne Kauf schaltet nichts frei");
+  await p7.evaluate(() => { window.__mockProduct.owned = true; });
+  await p7.click("#btnRestore");
+  await p7.waitForTimeout(100);
+  check(await p7.evaluate(() => isFull()), "Wiederherstellen mit früherem Kauf schaltet frei");
+  check(await p7.isVisible("#scr-templates"), "Vorlagen bleiben nach dem Freischalten offen");
+  await p7.evaluate(() => openModal("mdl-about"));
+  await back();
+  check(await p7.evaluate(() => Array.from(document.querySelectorAll(".modal")).every(m => m.hidden)), "Zurück schließt offene Dialoge");
+  check(await p7.isVisible("#scr-templates"), "… und bleibt dabei auf derselben Seite");
+  await back();
+  check(await p7.isVisible("#scr-home"), "Zurück führt von den Vorlagen zur Startseite");
+  await p7.click('[data-to="levels"]');
+  await p7.locator(".lvl").nth(0).click();
+  await p7.waitForTimeout(300);
+  const tb = await p7.evaluate(() => Array.from(document.querySelectorAll("#scr-game .toolbar .btn")).map(b => { const r = b.getBoundingClientRect(); return Math.round(r.top + r.height / 2); }));
+  check(new Set(tb).size === 1, "Werkzeugleiste auf 360 dp in einer Zeile");
+  check(await p7.evaluate(() => { const c = document.getElementById("gameChips"); return c.getBoundingClientRect().right <= innerWidth + 1; }), "Regel-Chips laufen nicht aus dem Bildschirm");
+  await drawOn(p7, "cvR", [[[10, 48], [86, 48]]]);
+  await back();
+  check(await p7.isVisible("#mdl-confirm"), "Zurück während des Zeichnens fragt nach");
+  await back();
+  check(await p7.isVisible("#scr-game") && (await p7.evaluate(() => game.drawn.length)) === 1, "Zweites Zurück schließt nur die Frage, die Zeichnung bleibt");
+  await back();
+  await p7.click("#confirmYes");
+  check(await p7.isVisible("#scr-levels"), "Nach Bestätigen zurück zur Levelübersicht");
+  await back();
+  await back();
+  check(await p7.evaluate(() => window.__exited === 1), "Zurück auf der Startseite beendet die App");
+  await ctx7.close();
 
   check(errors.length === 0, "Keine Fehler in der Konsole" + (errors.length ? ": " + errors.join(" | ") : ""));
   await browser.close();

@@ -406,6 +406,21 @@ textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, Menlo
   #scr-game .topbar .chips { flex: 1 0 100%; order: 3; padding-left: 58px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
   #scr-game .topbar .chips::-webkit-scrollbar { display: none; }
 }
+/* Handys bis 440 px Breite (viele Android-Geräte haben 360–412 dp):
+   Werkzeugleiste in einer Zeile, Rückgängig und Löschen nur als Symbol.
+   Sonst bricht sie in zwei oder drei Zeilen um und die Zeichenfläche schrumpft.
+   Die Beschriftung bleibt für Screenreader erhalten. */
+@media (max-width: 440px) {
+  #scr-game .toolbar { flex-wrap: nowrap; gap: 10px; }
+  #scr-game .toolbar .btn:not(.big) { padding: 0 14px; }
+  #scr-game .toolbar .btn:not(.big) span {
+    position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  #scr-game .toolbar .spacer { flex: 1 1 auto; max-width: 40px; }
+}
+@media (max-width: 380px) {
+  #scr-game .topbar .chips { padding-left: 0; }
+}
 @media (max-width: 600px), (max-height: 600px) {
   #mdl-result .sheet { padding: 16px; }
   .result-art { width: min(300px, 72vw, 34vh); }
@@ -497,6 +512,37 @@ textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, Menlo
 /* über der Auswahlleiste statt darauf */
 body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
 .toast .btn { min-height: 36px; padding: 0 14px; font-size: 15px; }
+/* ---------- Tagesaufgabe, Lernstand, Wiederholung (1.0.0 Build 1002) ---------- */
+.tone-daily .mr-icon { background: rgba(23,137,90,.14); color: var(--ok); }
+.tone-daily .daily-streak { display: block; color: var(--ok); font-weight: 700; font-size: 14px; }
+.tone-daily .daily-streak:empty { display: none; }
+.menu-row .daily-done { color: var(--ok); font-weight: 700; }
+.replay-row { display: flex; justify-content: center; margin-top: 4px; }
+.btn.small { min-height: 40px; font-size: 15px; padding: 0 12px; gap: 6px; }
+.btn.small svg { width: 18px; height: 18px; }
+.hint-left { color: var(--muted); }
+.skills { display: grid; gap: 12px; margin: 14px 0 6px; }
+.skill-row { display: grid; grid-template-columns: minmax(120px, 34%) 1fr auto; align-items: center; gap: 12px; }
+.skill-row .sk-name { font-weight: 700; }
+.skill-row .sk-name small { display: block; color: var(--muted); font-weight: 500; font-size: 13px; }
+.skill-row .sk-bar { height: 14px; border-radius: 7px; background: var(--ink-soft); overflow: hidden; }
+.skill-row .sk-bar i { display: block; height: 100%; border-radius: 7px; background: var(--ink); }
+.skill-row.weak .sk-bar i { background: var(--pen); }
+.skill-row .sk-val { font-family: var(--font-display); font-weight: 900; font-size: 18px; min-width: 52px; text-align: right; }
+.skill-row.sk-empty .sk-val { color: var(--muted); font-weight: 600; font-size: 14px; font-family: var(--font-body); }
+.tip { background: var(--pen-soft); border-radius: var(--r-sm); padding: 10px 12px; font-weight: 600; }
+.stat-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 6px; }
+.stat-tiles div { border: 2px solid var(--line); border-radius: var(--r-sm); padding: 8px 10px; }
+.stat-tiles b { display: block; font-family: var(--font-display); font-size: 22px; }
+.stat-tiles small { color: var(--muted); font-size: 13px; line-height: 1.3; display: block; hyphens: manual; }
+@media (max-width: 480px) {
+  .skill-row { grid-template-columns: 1fr auto; gap: 4px 10px; }
+  .skill-row .sk-bar { grid-column: 1 / -1; grid-row: 2; }
+  .stat-tiles { gap: 6px; }
+  .stat-tiles div { padding: 6px 8px; }
+  .stat-tiles b { font-size: 17px; white-space: nowrap; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .toast, .btn, .toggle::after { transition: none; }
 }
@@ -542,6 +588,10 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
               <span class="progress-line" id="homeProgress"></span>
             </span>
           </button>
+          <button type="button" class="menu-row tone-daily" data-action="startDaily">
+            <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg></span>
+            <span><strong data-i18n="daily">Tagesaufgabe</strong><span id="dailySub"></span><span class="daily-streak" id="dailyStreak"></span></span>
+          </button>
           <button type="button" class="menu-row tone-ink" data-action="go" data-to="free">
             <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 7l3 3"/></svg></span>
             <span><strong data-i18n="freePlay">Freies Spiel</strong><span data-i18n="freePlaySub">Figur und Regeln selbst wählen</span></span>
@@ -553,6 +603,10 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
           <button type="button" class="menu-row tone-marker" data-action="go" data-to="templates">
             <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 15l3-6 3 4 2-2"/></svg></span>
             <span><strong data-i18n="templates">Meine Vorlagen</strong><span data-i18n="templatesSub">Eigene Figuren zeichnen und per QR-Code teilen</span></span>
+          </button>
+          <button type="button" class="menu-row tone-ink" data-action="openStats">
+            <span class="mr-icon"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h16"/><rect x="5" y="11" width="3.5" height="6" rx="1"/><rect x="10.25" y="6" width="3.5" height="11" rx="1"/><rect x="15.5" y="9" width="3.5" height="8" rx="1"/></svg></span>
+            <span><strong data-i18n="stats">Mein Lernstand</strong><span data-i18n="statsSub">Stärken und Übungsfelder auf einen Blick</span></span>
           </button>
           <div class="footer-links">
             <button type="button" class="btn ghost" data-action="openAbout" data-i18n="about">Über das Spiel</button>
@@ -760,6 +814,11 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
         <span><i class="lg-near"></i><span data-i18n="legendNear">knapp</span></span>
         <span><i class="lg-miss"></i><span data-i18n="legendMiss">daneben</span></span>
       </div>
+      <div class="replay-row">
+        <button type="button" class="btn ghost small" id="btnReplay" data-action="replay">
+          <svg class="i" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><span data-i18n="replay">Zeichnung abspielen</span>
+        </button>
+      </div>
       <p class="score-big"><mark id="resScore">0 %</mark></p>
       <div class="result-stars" id="resStars"></div>
       <p class="verdict" id="resVerdict"></p>
@@ -823,6 +882,20 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
         <button type="button" class="btn" data-action="legal" data-page="datenschutz" data-i18n="privacy">Datenschutz</button>
         <button type="button" class="btn" data-action="legal" data-page="impressum" data-i18n="imprint">Impressum</button>
       </div>
+    </div>
+  </div>
+
+  <div class="modal" id="mdl-stats" hidden role="dialog" aria-modal="true" aria-labelledby="statsTitle">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h2 id="statsTitle" data-i18n="stats">Mein Lernstand</h2>
+        <button type="button" class="icon-btn" data-action="closeModal" data-i18n-aria="close"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>
+      <p class="hint-left" data-i18n="statsIntro">Durchschnitt deiner besten Ergebnisse je Fähigkeit – aus Leveln und Tagesaufgaben.</p>
+      <div class="skills" id="statsSkills"></div>
+      <p class="tip" id="statsTip" hidden></p>
+      <div class="stat-tiles" id="statsTiles"></div>
+      <p class="fineprint" data-i18n="dailySame">Die Tagesaufgabe ist an einem Tag auf allen Geräten gleich – praktisch für einen kleinen Wettbewerb in der Klasse.</p>
     </div>
   </div>
 
@@ -924,7 +997,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
    ================================================================= */
 
 /* -------------------- 1  Konstanten, Speicher -------------------- */
-const APP_VERSION = "1.0.0";
+const APP_VERSION = "1.0.1";
 /* Ziel aller QR-Codes und geteilten Links. Ist Drawmory installiert, öffnet
    iOS diese Adresse als Universal Link direkt in der App (Freigabe in
    .well-known/apple-app-site-association der Domain, Plugin drawmory-links).
@@ -957,6 +1030,32 @@ const store = {
 const I18N = {
   de: {
     tagline: "Anschauen. Merken. Nachzeichnen.",
+    daily: "Tagesaufgabe",
+    dailyToday: "Heute: {skill} – {shape}",
+    dailyBest: "Heute geschafft: {s} %",
+    dailyStreak: "{n} Tage in Folge",
+    dailyTitle: "Tagesaufgabe · {shape}",
+    dailySame: "Die Tagesaufgabe ist an einem Tag auf allen Geräten gleich – praktisch für einen kleinen Wettbewerb in der Klasse.",
+    stats: "Mein Lernstand",
+    statsSub: "Stärken und Übungsfelder auf einen Blick",
+    statsIntro: "Durchschnitt deiner besten Ergebnisse je Fähigkeit – aus Leveln und Tagesaufgaben.",
+    statsTasks: "{n} Aufgaben",
+    statsNone: "noch offen",
+    statsTip: "Übungsfeld {skill}: {tip}",
+    statsLevels: "Level gespielt",
+    statsStars: "Sterne",
+    statsDays: "Tages\u00ADaufgaben",
+    replay: "Zeichnung abspielen",
+    sk_copy: "Abzeichnen",
+    sk_memory: "Aus dem Gedächtnis",
+    sk_scale: "Maßstab",
+    sk_transform: "Spiegeln und Drehen",
+    sk_timed: "Auf Zeit",
+    tip_copy: "Zeichne im freien Spiel ohne Raster rechts, dann zählt nur dein Augenmaß.",
+    tip_memory: "Stelle im freien Spiel 8 Sekunden Sichtzeit ein und verkürze schrittweise.",
+    tip_scale: "Zähle die Kästchen jeder Seite und rechne sie mal 2 oder durch 2, bevor du zeichnest.",
+    tip_transform: "Achte auf einen Eckpunkt: Wo liegt er nach dem Spiegeln oder Drehen? Von dort aus weiterzeichnen.",
+    tip_timed: "Erst die langen Linien, dann die Einzelheiten – so ist die Form auch bei Zeitdruck erkennbar.",
     drawTime: "Zeichenzeit",
     unlimited: "Unbegrenzt",
     chipDrawTime: "{n} s Zeichenzeit",
@@ -1052,6 +1151,7 @@ const I18N = {
     back: "Zurück",
     home: "Startseite",
     quit: "Spiel beenden",
+    quitAsk: "Spiel wirklich beenden? Diese Runde wird nicht gewertet.",
     close: "Schließen",
     cancel: "Abbrechen",
     world1: "Erste Linien", world1Sub: "Die Vorlage bleibt stehen. Zähle die Kästchen.",
@@ -1197,6 +1297,32 @@ const I18N = {
   },
   en: {
     tagline: "Look. Remember. Redraw.",
+    daily: "Daily challenge",
+    dailyToday: "Today: {skill} – {shape}",
+    dailyBest: "Done today: {s} %",
+    dailyStreak: "{n} days in a row",
+    dailyTitle: "Daily challenge · {shape}",
+    dailySame: "The daily challenge is the same on every device on a given day – handy for a small class competition.",
+    stats: "My progress",
+    statsSub: "Strengths and areas to practise at a glance",
+    statsIntro: "Average of your best results per skill – from levels and daily challenges.",
+    statsTasks: "{n} tasks",
+    statsNone: "not yet",
+    statsTip: "Practise {skill}: {tip}",
+    statsLevels: "Levels played",
+    statsStars: "Stars",
+    statsDays: "Daily challenges",
+    replay: "Replay drawing",
+    sk_copy: "Copying",
+    sk_memory: "From memory",
+    sk_scale: "Scale",
+    sk_transform: "Mirror and rotate",
+    sk_timed: "Against the clock",
+    tip_copy: "In free play, switch off the grid on the right so only your eye counts.",
+    tip_memory: "In free play, set the viewing time to 8 seconds and shorten it step by step.",
+    tip_scale: "Count the squares of each side and multiply or divide by 2 before you draw.",
+    tip_transform: "Pick one corner: where does it end up after mirroring or rotating? Draw on from there.",
+    tip_timed: "Long lines first, details later – the shape stays recognisable even under time pressure.",
     drawTime: "Drawing time",
     unlimited: "Unlimited",
     chipDrawTime: "{n} s to draw",
@@ -1292,6 +1418,7 @@ const I18N = {
     back: "Back",
     home: "Home",
     quit: "Quit game",
+    quitAsk: "Really quit the game? This round won’t be scored.",
     close: "Close",
     cancel: "Cancel",
     world1: "First lines", world1Sub: "The original stays on screen. Count the squares.",
@@ -2170,9 +2297,151 @@ function startFree(overrideShape) {
   });
 }
 
+/* --- Tagesaufgabe ---
+   Jeden Tag eine feste Aufgabe, ohne Server: Die Fähigkeit wechselt reihum
+   (Abzeichnen, Gedächtnis, Maßstab, Spiegeln/Drehen, Auf Zeit), Figur und
+   Variante ergeben sich aus dem Datum. So hat eine ganze Klasse am selben
+   Tag dieselbe Aufgabe – auf jedem Gerät, offline. Gehört zur Gratis-Fassung. */
+const SKILLS = ["copy", "memory", "scale", "transform", "timed"];
+const DAILY_VARIANTS = {
+  copy:      { shapes: ["star", "cube", "tree", "car", "snowman", "glasses", "kite", "crown", "spiral", "heart"],
+               s: { view: 0, gridL: true, gridR: false, scale: 1, ruler: false } },
+  memory:    { shapes: ["flag", "houseDoor", "bolt", "fish", "boat", "kite", "crown", "envelope", "key", "rocket"],
+               s: { view: 5, gridL: true, gridR: true, scale: 1, ruler: false } },
+  scale:     { shapes: ["square", "triangle", "stairs", "arrow", "flag", "bolt", "envelope", "houseDoor"],
+               s: { view: 0, gridL: true, gridR: true, ruler: true }, scales: [2, 0.5] },
+  transform: { shapes: ["flag", "stairs", "arrow", "fish", "bolt", "key", "angle", "zigzag"],
+               s: { view: 0, gridL: true, gridR: true, scale: 1, ruler: true }, transforms: ["mirrorV", "mirrorH", "rot90", "rot180"] },
+  timed:     { shapes: ["square", "triangle", "house", "arrow", "plus", "rhombus", "stairs", "envelope"],
+               s: { view: 0, gridL: true, gridR: true, scale: 1, ruler: true, drawTime: 10 } }
+};
+function dayKey(d) {
+  d = d || new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function hashStr(str) {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+function dailyTask(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  const dayNo = Math.floor(Date.UTC(y, m - 1, d) / 864e5);
+  const skill = SKILLS[dayNo % SKILLS.length];
+  const v = DAILY_VARIANTS[skill];
+  const h = hashStr("drawmory:" + key);
+  const shape = v.shapes[h % v.shapes.length];
+  const st = Object.assign({ transform: "none", drawTime: 0, scale: 1 }, v.s);
+  if (v.scales) st.scale = v.scales[(h >>> 8) % v.scales.length];
+  if (v.transforms) {
+    /* keine Verwandlung, die bei dieser Figur nichts verändert */
+    const plain = JSON.stringify(SHAPES[shape]);
+    for (let j = 0; j < v.transforms.length; j++) {
+      const tr = v.transforms[((h >>> 8) + j) % v.transforms.length];
+      if (JSON.stringify(transformStrokes(SHAPES[shape], tr)) !== plain) { st.transform = tr; break; }
+    }
+  }
+  return { key, skill, shape, settings: st };
+}
+function getDaily() {
+  const d = store.get("daily", {});
+  return (d && typeof d === "object" && !Array.isArray(d)) ? d : {};
+}
+/* Tage in Folge mit gelöster Tagesaufgabe; heute noch offen bricht die Serie nicht */
+function dailyStreakCount() {
+  const all = getDaily(), day = new Date();
+  if (!all[dayKey(day)]) day.setDate(day.getDate() - 1);
+  let n = 0;
+  while (all[dayKey(day)] && n < 1000) { n++; day.setDate(day.getDate() - 1); }
+  return n;
+}
+function startDaily() {
+  const task = dailyTask(dayKey());
+  startRound({
+    mode: "daily", shapeId: task.shape, strokes: SHAPES[task.shape],
+    title: t("dailyTitle", { shape: shapeName(task.shape) }),
+    settings: Object.assign({}, task.settings)
+  }, res => {
+    const all = getDaily(), prev = all[task.key];
+    const before = prev && typeof prev.s === "number" ? prev.s : -1;
+    all[task.key] = { s: Math.max(res.score, before), k: task.skill, n: ((prev && prev.n) || 0) + 1 };
+    const keys = Object.keys(all).sort();
+    while (keys.length > 400) delete all[keys.shift()];
+    store.set("daily", all);
+    showResult(res, { actions: [
+      { label: t("retry"), cls: "", fn: () => startDaily() },
+      { label: t("stats"), cls: "pen", fn: () => { goHome(); openStats(); } }
+    ]});
+  });
+}
+
+/* --- Lernstand: Fähigkeiten aus Leveln und Tagesaufgaben --- */
+function skillsOf(st) {
+  const k = [];
+  if (st.view > 0) k.push("memory");
+  if (st.scale !== 1) k.push("scale");
+  if (st.transform && st.transform !== "none") k.push("transform");
+  if (st.drawTime) k.push("timed");
+  if (!k.length) k.push("copy");
+  return k;
+}
+function skillStats() {
+  const acc = {};
+  SKILLS.forEach(k => { acc[k] = { sum: 0, n: 0 }; });
+  LEVELS.forEach((L, i) => {
+    const b = bestOf(i);
+    if (b !== null) skillsOf(L).forEach(k => { acc[k].sum += b; acc[k].n++; });
+  });
+  Object.values(getDaily()).forEach(r => {
+    if (r && acc[r.k] && typeof r.s === "number") { acc[r.k].sum += r.s; acc[r.k].n++; }
+  });
+  SKILLS.forEach(k => { acc[k].avg = acc[k].n ? Math.round(acc[k].sum / acc[k].n) : null; });
+  return acc;
+}
+function openStats() { renderStats(); openModal("mdl-stats"); }
+function renderStats() {
+  const acc = skillStats();
+  const rated = SKILLS.filter(k => acc[k].n >= 2);
+  const weakest = rated.length >= 2 ? rated.reduce((a, b) => acc[b].avg < acc[a].avg ? b : a) : null;
+  const weak = weakest && acc[weakest].avg < 80 ? weakest : null;
+  const box = document.getElementById("statsSkills");
+  box.textContent = "";
+  SKILLS.forEach(k => {
+    const a = acc[k];
+    const row = document.createElement("div");
+    row.className = "skill-row" + (a.n ? "" : " sk-empty") + (k === weak ? " weak" : "");
+    const name = document.createElement("span"); name.className = "sk-name"; name.textContent = t("sk_" + k);
+    if (a.n) { const sm = document.createElement("small"); sm.textContent = t("statsTasks", { n: a.n }); name.appendChild(sm); }
+    const bar = document.createElement("span"); bar.className = "sk-bar";
+    const fill = document.createElement("i"); fill.style.width = (a.avg || 0) + "%"; bar.appendChild(fill);
+    const val = document.createElement("span"); val.className = "sk-val"; val.textContent = a.n ? a.avg + " %" : t("statsNone");
+    row.append(name, bar, val);
+    box.appendChild(row);
+  });
+  const tip = document.getElementById("statsTip");
+  tip.hidden = !weak;
+  tip.textContent = weak ? t("statsTip", { skill: t("sk_" + weak), tip: t("tip_" + weak) }) : "";
+  let played = 0, stars = 0;
+  LEVELS.forEach((_, i) => { const v = bestOf(i); if (v !== null) { played++; stars += starsFor(v); } });
+  const days = Object.keys(getDaily()).length, streak = dailyStreakCount();
+  const tiles = document.getElementById("statsTiles");
+  tiles.textContent = "";
+  [[played + " / " + LEVELS.length, t("statsLevels")],
+   [stars + " / " + LEVELS.length * 3, t("statsStars")],
+   [String(days), t("statsDays") + (streak >= 2 ? " · " + t("dailyStreak", { n: streak }) : "")]].forEach(([v, l]) => {
+    const d = document.createElement("div");
+    const b = document.createElement("b"); b.textContent = v;
+    const sm = document.createElement("small"); sm.textContent = l;
+    d.append(b, sm); tiles.appendChild(d);
+  });
+}
+
 /* --- Ergebnisdialog --- */
 let resultAnim = 0;
+let lastResult = null, replayRun = 0;
 function showResult(res, opts) {
+  lastResult = res; replayRun++;
+  document.getElementById("btnReplay").disabled = false;
   const stars = starsFor(res.score);
   const starsEl = document.getElementById("resStars");
   starsEl.textContent = "";
@@ -2274,6 +2543,75 @@ function drawOverlay(cv, res, penColor, animate) {
   };
   paint(0);
   requestAnimationFrame(step);
+}
+
+/* Zeichnung abspielen: die eigenen Striche erscheinen in der Reihenfolge,
+   in der sie gezeichnet wurden, nummeriert, über der blassen Vorlage.
+   Hilft beim Besprechen: Wo wurde angesetzt, was kam zuerst? */
+function cutStroke(s, len) {
+  const out = [s[0]];
+  for (let i = 1; i < s.length && len > 0; i++) {
+    const a = s[i - 1], b = s[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (d <= len) { out.push(b); len -= d; }
+    else { const f = len / d; out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); len = 0; }
+  }
+  return out;
+}
+function replayDrawing() {
+  const res = lastResult, cv = document.getElementById("cvResult"), btn = document.getElementById("btnReplay");
+  if (!res || !res.drawn || !res.drawn.length) return;
+  const run = ++replayRun;
+  const k = fitCanvas(cv), ctx = cv.getContext("2d");
+  const tgt = res.target.map(s => s.map(p => [p[0] + res.offset[0], p[1] + res.offset[1]]));
+  const b = bbox(tgt.concat(res.drawn));
+  const span = Math.max(b.w, b.h, 8), sc = (U * 0.86) / span;
+  const mp = p => [(p[0] - b.x0 - b.w / 2) * sc + U / 2, (p[1] - b.y0 - b.h / 2) * sc + U / 2];
+  const T = tgt.map(s => s.map(mp)), D = res.drawn.map(s => s.map(mp));
+  const lw = Math.max(2, LINE_W * k * Math.min(1.4, Math.max(0.8, sc)));
+  const lens = D.map(strokeLength);
+  const total = lens.reduce((a, l) => a + l, 0);
+  const gap = Math.max(4, total * 0.05);
+  const whole = total + gap * (D.length - 1);
+  const dur = Math.min(5000, Math.max(1600, whole * 16));
+  const pen = css("--pen"), ink = css("--ink");
+  btn.disabled = true;
+  const paint = p => {
+    let left = p * whole;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.globalAlpha = 0.3; drawStrokes(ctx, T, k, ink, lw * 0.8); ctx.globalAlpha = 1;
+    const shown = [], starts = [];
+    for (let i = 0; i < D.length && left >= 0; i++) {
+      starts.push(D[i][0]);
+      if (left >= lens[i]) { shown.push(D[i]); left -= lens[i] + gap; }
+      else { shown.push(cutStroke(D[i], left)); left = -1; }
+    }
+    drawStrokes(ctx, shown, k, pen, lw);
+    if (D.length > 1) {
+      const r = Math.max(9, lw * 2.4);
+      ctx.save();
+      ctx.font = "800 " + Math.round(r * 1.15) + "px " + css("--font-body");
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      starts.forEach((p, i) => {
+        const x = Math.min(cv.width - r, Math.max(r, p[0] * k)), y = Math.min(cv.height - r, Math.max(r, p[1] * k));
+        ctx.fillStyle = pen; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.fillText(String(i + 1), x, y + 0.5);
+      });
+      ctx.restore();
+    }
+  };
+  const t0 = performance.now();
+  const frame = now => {
+    if (run !== replayRun || cv.closest("[hidden]")) { btn.disabled = false; return; }
+    const p = Math.min(1, (now - t0) / dur);
+    paint(p);
+    if (p < 1) { requestAnimationFrame(frame); return; }
+    setTimeout(() => {
+      if (run !== replayRun) return;
+      btn.disabled = false;
+      if (!cv.closest("[hidden]")) drawOverlay(cv, res, null, true);
+    }, 1400);
+  };
+  requestAnimationFrame(frame);
 }
 
 /* Kleiner Erfolgston, nur nach Nutzeraktion und wenn eingeschaltet */
@@ -3256,7 +3594,7 @@ const QR = (function () {
 })();
 
 /* -------------------- 12  Vollversion (In-App-Kauf) --------------------
-   Gratis: Level 1–10, Mehrspieler mit 2 Personen, Import und Spielen
+   Gratis: Level 1–11, Mehrspieler mit 2 Personen, Import und Spielen
    geteilter Vorlagen, freies Spiel. Vollversion: alles.
    Die Sperre gilt nur in der App (window.cordova). Die Webfassung ist die
    Landeseite der QR-Codes und bleibt vollständig nutzbar.
@@ -3364,6 +3702,33 @@ document.addEventListener("deviceready", () => {
   if (["levels", "templates", "multiSetup"].includes(currentScreen)) showScreen(currentScreen, { noPush: true });
 }, false);
 
+/* Android-Zurücktaste und Zurück-Geste (Cordova). Ohne eigenen Handler
+   schließt Android die App. Im Spiel fragt die App vorher nach, weil die
+   Zurück-Geste vom Bildschirmrand beim Zeichnen leicht ausgelöst wird. */
+function onBackButton(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  const open = Array.from(document.querySelectorAll(".modal")).find(m => !m.hidden);
+  const askQuit = () => confirmBox(t("quitAsk"), t("quit"), () => ACTIONS.quitGame());
+  if (open) {
+    if (open.id === "mdl-intro") return finishIntro();
+    if (open.id === "mdl-confirm") return ACTIONS.confirmNo();
+    if (open.id !== "mdl-result") return closeModals();
+    if (match) return askQuit();
+    closeModals();
+    return ACTIONS.quitGame();
+  }
+  if (currentScreen === "game" || currentScreen === "handoff") {
+    if (match || (game.drawn.length && !game.locked)) return askQuit();
+    return ACTIONS.quitGame();
+  }
+  if (currentScreen === "multiResult") return goHome();
+  if (currentScreen !== "home") return ACTIONS.back();
+  if (navigator.app && navigator.app.exitApp) navigator.app.exitApp();
+}
+document.addEventListener("deviceready", () => {
+  document.addEventListener("backbutton", onBackButton, false);
+}, false);
+
 /* -------------------- 13  Einführung -------------------- */
 const INTRO = [
   { title: "intro1Title", text: "intro1Text", art:
@@ -3404,6 +3769,12 @@ function renderHome() {
   let s = 0;
   LEVELS.forEach((_, i) => { const v = bestOf(i); if (v !== null) s += starsFor(v); });
   document.getElementById("homeProgress").textContent = s ? t("progressStars", { s, t: LEVELS.length * 3 }) : "";
+  const task = dailyTask(dayKey()), rec = getDaily()[task.key];
+  const sub = document.getElementById("dailySub");
+  sub.textContent = rec ? t("dailyBest", { s: rec.s }) : t("dailyToday", { skill: t("sk_" + task.skill), shape: shapeName(task.shape) });
+  sub.classList.toggle("daily-done", !!rec);
+  const streak = dailyStreakCount();
+  document.getElementById("dailyStreak").textContent = streak >= 2 ? t("dailyStreak", { n: streak }) : "";
 }
 
 function renderLevels() {
@@ -3569,6 +3940,7 @@ function setLanguage(l) {
   /* sichtbaren Bildschirm in der neuen Sprache neu aufbauen */
   if (!document.getElementById("mdl-intro").hidden) renderIntro();
   if (!document.getElementById("mdl-paywall").hidden) updatePaywall();
+  if (!document.getElementById("mdl-stats").hidden) renderStats();
   updateProRow();
   if (currentScreen === "game" && game.round) {
     renderRoundHead(game.round);
@@ -3619,7 +3991,10 @@ const ACTIONS = {
   openAbout: () => openModal("mdl-about"),
   legal: b => openLegal(b.dataset.page),
   closeModal: () => closeModals(),
-  resetProgress: () => confirmBox(t("confirmReset"), t("reset"), () => { store.del("progress"); toast(t("resetDone")); renderHome(); }),
+  resetProgress: () => confirmBox(t("confirmReset"), t("reset"), () => { store.del("progress"); store.del("daily"); toast(t("resetDone")); renderHome(); }),
+  startDaily: () => startDaily(),
+  openStats: () => openStats(),
+  replay: () => replayDrawing(),
   startFree: () => startFree(),
   startMulti: () => startMulti(),
   beginTurn: () => beginTurn(),

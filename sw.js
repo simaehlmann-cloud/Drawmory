@@ -4,9 +4,10 @@
    - Übrige Dateien: erst Cache, Aktualisierung im Hintergrund
    Der Worker übernimmt erst nach Bestätigung durch die App (SKIP_WAITING). */
 
-/* Der Name trägt die App-Version. validate.js vergleicht ihn mit
-   APP_VERSION in der index.html. */
-const CACHE = 'drawmory-1.0.0';
+/* Der Name trägt Build und App-Version. validate.js vergleicht das Ende mit
+   APP_VERSION in der index.html. Ein neuer Build mit gleicher Version
+   braucht trotzdem einen neuen Namen, sonst lädt die Webfassung nicht neu. */
+const CACHE = 'drawmory-b1003-1.0.1';
 
 const ASSETS = [
   './',

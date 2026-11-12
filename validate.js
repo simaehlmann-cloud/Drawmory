@@ -74,6 +74,18 @@ try {
   lv.forEach((l, i) => { if (l.drawTime !== undefined && !(Number.isInteger(l.drawTime) && l.drawTime >= 3 && l.drawTime <= 15)) E(`Level ${i + 1}: Zeichenzeit ${l.drawTime} s nicht sinnvoll`); });
   const ids = WORLDS.flatMap(w => w.levels.map((_, li) => w.key + "-" + (li + 1)));
   if (new Set(WORLDS.map(w => w.key)).size !== WORLDS.length) E("Doppelte Welt-Schlüssel – Fortschritts-IDs würden kollidieren");
+  /* Tagesaufgabe: jede Fähigkeit hat Varianten, alle Figuren gibt es */
+  {
+    const d0 = js.indexOf("const SKILLS = ["), d1 = js.indexOf("function dayKey");
+    vm.runInContext(js.slice(d0, d1) + ";this.SKILLS=SKILLS;this.DV=DAILY_VARIANTS;", ctx);
+    for (const k of ctx.SKILLS) {
+      const v = ctx.DV[k];
+      if (!v) { E(`Tagesaufgabe: keine Varianten für ${k}`); continue; }
+      for (const id of v.shapes) if (!SHAPES[id]) E(`Tagesaufgabe ${k}: unbekannte Figur ${id}`);
+      for (const tr of v.transforms || []) if (!TRANSFORMS[tr]) E(`Tagesaufgabe ${k}: unbekannte Verwandlung ${tr}`);
+      for (const sc of v.scales || []) if (![1, 2, 0.5].includes(sc)) E(`Tagesaufgabe ${k}: Maßstab ${sc} nicht vorgesehen`);
+    }
+  }
   O(`${Object.keys(SHAPES).length} Figuren, ${lv.length} Level`);
 } catch (e) { E("Daten nicht auswertbar: " + e.message); }
 
@@ -92,6 +104,10 @@ if (I18N) {
   if (SHAPES) Object.keys(SHAPES).forEach(id => used.add("s_" + id));
   if (WORLDS) WORLDS.forEach(w => { used.add(w.key); used.add(w.key + "Sub"); });
   ["v0", "v1", "v2", "v3"].forEach(k => used.add(k));
+  /* Fähigkeiten (Tagesaufgabe, Lernstand): t("sk_" + k) und t("tip_" + k) */
+  const skillList = (js.match(/const SKILLS = \[([^\]]+)\]/) || [])[1];
+  if (!skillList) E("SKILLS nicht gefunden");
+  else for (const m of skillList.matchAll(/"(\w+)"/g)) { used.add("sk_" + m[1]); used.add("tip_" + m[1]); }
   /* zusammengesetzte Schlüssel */
   if (TRANSFORMS) Object.keys(TRANSFORMS).filter(k => k !== "none").forEach(k => { used.add("task_" + k); used.add("chip_" + k); });
   for (const m of js.matchAll(/openPaywall\("(\w+)"\)/g)) used.add(m[1]);

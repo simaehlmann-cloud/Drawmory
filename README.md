@@ -10,8 +10,10 @@ Android ist vorbereitet.
 
 **Weg in den App Store:** siehe [TESTFLIGHT.md](TESTFLIGHT.md) – Schritt für
 Schritt bis TestFlight, einschließlich In-App-Kauf und Universal Links.
+**Weg in den Play Store:** Anleitung als Dokument im Projekt „Zeichnenspiel“
+(eigener Keystore, Secrets, Einmalkauf, interner und geschlossener Test).
 
-Version 1.0.0 · versionCode 1000 · iOS-Build 1000
+Version 1.0.1 · Android-versionCode 1003 · iOS-Build 1003
 
 ## Funktionen
 
@@ -41,6 +43,14 @@ Version 1.0.0 · versionCode 1000 · iOS-Build 1000
 - **Vollversion per In-App-Kauf (1,99 €):** gratis sind die Welten „Erste Linien“ und „Auf Zeit“ (Level 1–11), Mehrspieler zu zweit,
   freies Spiel sowie Import und Spielen geteilter Vorlagen. Die Webfassung
   (Ziel der QR-Codes) bleibt vollständig frei.
+- **Tagesaufgabe** (gratis): jeden Tag eine feste Aufgabe, die Fähigkeit wechselt
+  reihum (Abzeichnen, Gedächtnis, Maßstab, Spiegeln/Drehen, Auf Zeit). Figur und
+  Variante ergeben sich aus dem Datum – alle Geräte haben am selben Tag dieselbe
+  Aufgabe, ganz ohne Server. Serie „n Tage in Folge“.
+- **Mein Lernstand** (gratis): Durchschnitt der besten Ergebnisse je Fähigkeit aus
+  Leveln und Tagesaufgaben, schwächstes Feld mit konkretem Übungstipp.
+- **Zeichnung abspielen:** im Ergebnis werden die eigenen Striche nummeriert in
+  der gezeichneten Reihenfolge über der blassen Vorlage nachgespielt.
 - **DE/EN** mit Flaggen-Umschalter, hell/dunkel/automatisch, Töne abschaltbar.
 
 ## Bewertung
@@ -141,11 +151,13 @@ hochgeladene Build-Nummer dauerhaft belegt ist. `validate.js` prüft das.
 node validate.js        # Syntax, DE/EN vollständig, IDs, Aktionen, Manifest, Icons, Versionen
 npm install && npx playwright install chromium
 python3 -m http.server 8765 &
-node smoketest.js       # 169 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
+node smoketest.js       # 206 Prüfungen: Level, Bewertung, Fehlerfarben, Maßstab,
                         # Spiegeln/Drehen, Zeichenzeit (auch Ablauf mitten im Strich),
                         # Nikolaus, Gedächtnis, Mehrspieler, Editor, QR-Rücklesen,
                         # Pakete, Landeseite, Universal-Link-Empfang, App-Import,
                         # Vollversion (nachgebildetes StoreKit und Google Play),
+                        # Wiederherstellen, Android-Zurücktaste, 360-dp-Handy,
+                        # Tagesaufgabe, Lernstand, Wiederholung,
                         # Einführung, DE/EN, Hochformat
 ```
 
@@ -154,22 +166,35 @@ node smoketest.js       # 169 Prüfungen: Level, Bewertung, Fehlerfarben, Maßst
 Drei Stellen müssen gleich sein, `validate.js` prüft das:
 `APP_VERSION` in index.html, `version` in config.xml, `CACHE` in sw.js – plus diese README.
 
-## Update einspielen (0.3.0 → 1.0.0, Store-Fassung)
+## Update einspielen (1.0.1, Build 1003: Store-Einreichung und Android-Test)
 
-Versionsnummer für den Store plus Feinschliff fürs iPhone.
-Diese Dateien ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
+Fasst zwei Updates zusammen: das Android-Update 1.0.1 (bisher nicht im Repo)
+und die neuen Funktionen nach der Ablehnung von Build 1001 bei Apple
+(Guideline 4.3). Build 1003, damit die Nummer sicher frei ist – auch falls
+1002 schon in der Play Console liegt. Diese Dateien ins Repo `Drawmory`
+hochladen, vorhandene werden überschrieben:
 
 ```
-index.html        APP_VERSION 1.0.0; „Gerät“ statt „iPad“ (Startseite, Übergabe);
-                  schmale Bildschirme: Regel-Chips in eigener Zeile unter dem Titel,
-                  Ergebnis kompakt, Knöpfe ohne Scrollen erreichbar
-config.xml        Version 1.0.0, iOS-Build 1000, Android-versionCode 1000
-sw.js             Cache-Name drawmory-1.0.0 (Webfassung lädt neu)
-README.md, TESTFLIGHT.md
+index.html        APP_VERSION 1.0.1
+                  Neu: Tagesaufgabe, Mein Lernstand, Zeichnung abspielen (DE/EN)
+                  Android-Zurücktaste/-Geste: schließt Dialoge, geht eine Seite
+                  zurück, fragt im Spiel nach, beendet die App nur auf der Startseite.
+                  Handys bis 440 px Breite: Werkzeugleiste im Spiel in einer Zeile,
+                  Rückgängig/Löschen als Symbol.
+config.xml        Version 1.0.1, iOS-Build 1003, Android-versionCode 1003
+sw.js             Cache-Name drawmory-b1003-1.0.1 (Webfassung lädt neu)
+validate.js       prüft Texte der Fähigkeiten und Daten der Tagesaufgabe
+smoketest.js      prüft Tagesaufgabe, Lernstand, Wiederholung, Android-Handy
+README.md
 ```
 
-Die Build-Nummer folgt der Version (0.3.0 → 300, 1.0.0 → 1000). So bleibt
-sie größer als jede Nummer, die für 0.3 schon hochgeladen wurde.
+Danach:
+- **App Store Connect:** In der abgelehnten Version die Versionsnummer von 1.0.0
+  auf **1.0.1** ändern (geht, solange nichts veröffentlicht ist), iOS-Workflow
+  mit „Run workflow“ starten, Build 1003 wählen, Hinweise für App Review
+  ergänzen, erneut einreichen.
+- **Play Console:** Android-Workflow liefert das AAB (versionCode 1003) für den
+  geschlossenen Test.
 
 Auf der GitHub-Webseite: ZIP entpacken, im Repo „Add file → Upload files“,
 **den Inhalt** des entpackten Ordners hineinziehen, „Commit changes“. Ordner,
