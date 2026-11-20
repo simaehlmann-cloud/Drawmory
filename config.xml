@@ -2,9 +2,9 @@
 <!-- Paketkennung: nach der ersten Veröffentlichung unveränderlich.
      Vor dem Anlegen in App Store Connect bewusst festlegen. -->
 <widget id="de.drawmory.app"
-        version="1.0.1"
-        android-versionCode="1003"
-        ios-CFBundleVersion="1003"
+        version="1.0.2"
+        android-versionCode="1004"
+        ios-CFBundleVersion="1004"
         xmlns="http://www.w3.org/ns/widgets"
         xmlns:cdv="http://cordova.apache.org/ns/1.0">
 
@@ -18,6 +18,9 @@
          Inhalte. Externe Links (GitHub-Datenschutz) gehen an Safari. -->
     <allow-intent href="mailto:*" />
     <allow-intent href="https://*/*" />
+    <!-- „Drawmory bewerten“ öffnet den eigenen Store direkt -->
+    <allow-intent href="itms-apps:*" />
+    <allow-intent href="market:*" />
 
     <preference name="DisallowOverscroll" value="true" />
     <preference name="Fullscreen" value="false" />

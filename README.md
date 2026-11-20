@@ -13,7 +13,7 @@ Schritt bis TestFlight, einschließlich In-App-Kauf und Universal Links.
 **Weg in den Play Store:** Anleitung als Dokument im Projekt „Zeichnenspiel“
 (eigener Keystore, Secrets, Einmalkauf, interner und geschlossener Test).
 
-Version 1.0.1 · Android-versionCode 1003 · iOS-Build 1003
+Version 1.0.2 · Android-versionCode 1004 · iOS-Build 1004
 
 ## Funktionen
 
@@ -165,6 +165,27 @@ node smoketest.js       # 206 Prüfungen: Level, Bewertung, Fehlerfarben, Maßst
 
 Drei Stellen müssen gleich sein, `validate.js` prüft das:
 `APP_VERSION` in index.html, `version` in config.xml, `CACHE` in sw.js – plus diese README.
+
+## Update einspielen (1.0.2, Build 1004: Bewerten und Feedback)
+
+Umsetzung aus dem Feedback-Bericht des geschlossenen Play-Tests. Diese Dateien
+ins Repo `Drawmory` hochladen, vorhandene werden überschrieben:
+
+```
+index.html        APP_VERSION 1.0.2
+                  Einstellungen: „Drawmory bewerten“ (iOS: Bewertungsseite im
+                  App Store, Apple-ID 6827935615; Android: Play Store; im Browser
+                  ausgeblendet) und „Feedback senden“ (E-Mail mit Version und Gerät).
+                  Keine eigene Bewertungs-Abfrage (Apple 5.6.1), keine Erwähnung
+                  der jeweils anderen Plattform.
+config.xml        Version 1.0.2, iOS-Build 1004, Android-versionCode 1004;
+                  allow-intent für itms-apps: und market:
+sw.js             Cache-Name drawmory-b1004-1.0.2
+open/index.html   Apple-ID eingetragen: „Im App Store laden“ + Safari-Banner;
+                  Android-Handys sehen „Bei Google Play laden“, Computer beide
+smoketest.js      prüft Bewerten/Feedback je Plattform und die Landeseite
+README.md
+```
 
 ## Update einspielen (1.0.1, Build 1003: Store-Einreichung und Android-Test)
 

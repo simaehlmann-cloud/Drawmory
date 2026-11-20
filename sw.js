@@ -7,7 +7,7 @@
 /* Der Name trägt Build und App-Version. validate.js vergleicht das Ende mit
    APP_VERSION in der index.html. Ein neuer Build mit gleicher Version
    braucht trotzdem einen neuen Namen, sonst lädt die Webfassung nicht neu. */
-const CACHE = 'drawmory-b1003-1.0.1';
+const CACHE = 'drawmory-b1004-1.0.2';
 
 const ASSETS = [
   './',

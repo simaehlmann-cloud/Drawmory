@@ -376,6 +376,7 @@ textarea { min-height: 110px; resize: vertical; font-family: ui-monospace, Menlo
 .sheet-head { display: flex; align-items: flex-start; gap: 10px; }
 .sheet-head h2 { flex: 1 1 auto; }
 .sheet p { margin: 8px 0; }
+a.btn { text-decoration: none; }
 .sheet .legal-links { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
 /* Ergebnis */
@@ -859,6 +860,10 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
         <span data-i18n="sound">Töne</span>
         <button type="button" class="toggle" role="switch" id="soundToggle" data-action="toggleSound" data-i18n-aria="sound"></button>
       </div>
+      <div class="actions feedback-row" style="justify-content:flex-start">
+        <a class="btn" id="btnRate" hidden data-i18n="rateApp">⭐ Drawmory bewerten</a>
+        <a class="btn" id="btnFeedback" href="mailto:smaehlmann.appdev@gmail.com" data-i18n="feedback">✉️ Feedback senden</a>
+      </div>
       <div class="actions" style="justify-content:flex-start">
         <button type="button" class="btn danger" data-action="resetProgress" data-i18n="resetProgress">Fortschritt zurücksetzen</button>
       </div>
@@ -997,7 +1002,7 @@ body.has-bar .toast { bottom: calc(86px + env(safe-area-inset-bottom)); }
    ================================================================= */
 
 /* -------------------- 1  Konstanten, Speicher -------------------- */
-const APP_VERSION = "1.0.1";
+const APP_VERSION = "1.0.2";
 /* Ziel aller QR-Codes und geteilten Links. Ist Drawmory installiert, öffnet
    iOS diese Adresse als Universal Link direkt in der App (Freigabe in
    .well-known/apple-app-site-association der Domain, Plugin drawmory-links).
@@ -1276,6 +1281,10 @@ const I18N = {
     themeDark: "Dunkel",
     sound: "Töne",
     resetProgress: "Fortschritt zurücksetzen",
+    rateApp: "⭐ Drawmory bewerten",
+    feedback: "✉️ Feedback senden",
+    feedbackSubject: "Drawmory – Feedback",
+    feedbackBody: "\n\n\n––\nBitte oben schreiben. Diese Angaben helfen bei Fehlern: {info}",
     confirmReset: "Alle Level-Ergebnisse löschen? Deine Vorlagen bleiben erhalten.",
     resetDone: "Fortschritt zurückgesetzt",
     reset: "Zurücksetzen",
@@ -1543,6 +1552,10 @@ const I18N = {
     themeDark: "Dark",
     sound: "Sounds",
     resetProgress: "Reset progress",
+    rateApp: "⭐ Rate Drawmory",
+    feedback: "✉️ Send feedback",
+    feedbackSubject: "Drawmory – feedback",
+    feedbackBody: "\n\n\n––\nPlease write above. This helps with bugs: {info}",
     confirmReset: "Delete all level results? Your templates are kept.",
     resetDone: "Progress reset",
     reset: "Reset",
@@ -3690,6 +3703,34 @@ function restorePurchases() {
     updatePaywall();
   }).catch(() => { shop.busy = false; shop.error = t("buyFailed"); updatePaywall(); });
 }
+/* Bewerten und Feedback (Wunsch aus dem Play-Test, wie bei PitchPro).
+   Bewusst nur Knöpfe in den Einstellungen und keine eigene Bewertungs-Abfrage:
+   Apple erlaubt dafür nur die System-Abfrage (Richtlinie 5.6.1).
+   Jede App verweist nur auf ihren eigenen Store; die iOS-App nennt keine
+   andere Plattform. In der Webfassung gibt es keinen Bewerten-Knopf. */
+const APP_STORE_ID = "6827935615";
+const PLAY_ID = "de.drawmory.app";
+const FEEDBACK_MAIL = "smaehlmann.appdev@gmail.com";
+function rateHref() {
+  const plat = window.cordova && window.cordova.platformId;
+  if (plat === "ios") return "itms-apps://itunes.apple.com/app/id" + APP_STORE_ID + "?action=write-review";
+  if (plat === "android") return "market://details?id=" + PLAY_ID;
+  return "";
+}
+function feedbackHref() {
+  const plat = (window.cordova && window.cordova.platformId) || "web";
+  const os = (navigator.userAgent.match(/Android [\d.]+|(?:iPhone|CPU) OS [\d_]+|iPad/) || [""])[0].replace(/_/g, ".");
+  const info = "Drawmory " + APP_VERSION + " · " + plat + (os ? " · " + os : "") + " · " + lang;
+  return "mailto:" + FEEDBACK_MAIL + "?subject=" + encodeURIComponent(t("feedbackSubject")) +
+    "&body=" + encodeURIComponent(t("feedbackBody", { info }));
+}
+function updateFeedbackRow() {
+  const href = rateHref(), rate = document.getElementById("btnRate");
+  rate.hidden = !href;
+  if (href) rate.href = href; else rate.removeAttribute("href");
+  document.getElementById("btnFeedback").href = feedbackHref();
+}
+
 function updateProRow() {
   const row = document.getElementById("proRow");
   row.hidden = !inApp();
@@ -3699,6 +3740,7 @@ function updateProRow() {
 document.addEventListener("deviceready", () => {
   initShop();
   updateProRow();
+  updateFeedbackRow();
   if (["levels", "templates", "multiSetup"].includes(currentScreen)) showScreen(currentScreen, { noPush: true });
 }, false);
 
@@ -3942,6 +3984,7 @@ function setLanguage(l) {
   if (!document.getElementById("mdl-paywall").hidden) updatePaywall();
   if (!document.getElementById("mdl-stats").hidden) renderStats();
   updateProRow();
+  updateFeedbackRow();
   if (currentScreen === "game" && game.round) {
     renderRoundHead(game.round);
     if (!game.round.playerName) document.getElementById("rightLabel").textContent = t("yourDrawing");
@@ -3987,7 +4030,7 @@ const ACTIONS = {
   lang: b => setLanguage(b.dataset.lang),
   theme: b => setTheme(b.dataset.theme),
   toggleSound: () => { store.set("sound", !store.get("sound", true)); updateSoundToggle(); },
-  openSettings: () => { updateSoundToggle(); openModal("mdl-settings"); },
+  openSettings: () => { updateSoundToggle(); updateFeedbackRow(); openModal("mdl-settings"); },
   openAbout: () => openModal("mdl-about"),
   legal: b => openLegal(b.dataset.page),
   closeModal: () => closeModals(),

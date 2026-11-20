@@ -552,14 +552,28 @@ const mockStore = platformId => `
   check(await p6.evaluate(() => { const c = document.querySelector("#previews canvas"); const d = c.getContext("2d").getImageData(0, 0, c.width, c.height).data; let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++; return n > 200; }), "Landeseite: Vorschau ist gezeichnet");
   check((await p6.getAttribute("#openApp", "href")) === "drawmory://import#t=" + packCode, "„In Drawmory öffnen“ übergibt den Code an die App");
   check((await p6.getAttribute("#web", "href")) === "../#t=" + packCode, "Browser-Weg behält den Code");
-  check(await p6.isHidden("#store") && await p6.isVisible("#soon"), "Ohne App-Store-ID: Hinweis „bald im App Store“");
+  check((await p6.getAttribute("#store", "href")) === "https://apps.apple.com/app/id6827935615" && await p6.isVisible("#store"), "iPad: Knopf „Im App Store laden“ mit Apple-ID");
+  check(await p6.isHidden("#play") && await p6.isHidden("#soon"), "iPad: kein Google-Play-Knopf, kein „bald“-Hinweis");
   await shot(p6, "12d-landing");
   await p6.goto(OPEN + "#t=" + packCode.slice(0, -3) + "xyz");
   check((await p6.textContent("#sub")).includes("unvollständig"), "Beschädigter Code: verständlicher Hinweis");
   await p6.goto(OPEN);
   check((await p6.textContent("#title")) === "Drawmory" && await p6.isHidden("#sub.error"), "Ohne Code: neutrale Seite ohne Fehlermeldung");
   check(landingErrors.length === 0, "Landeseite ohne Fehler" + (landingErrors.length ? ": " + landingErrors.join(" | ") : ""));
+  await p6.goto(BASE);
+  await p6.evaluate(() => { closeModals(); ACTIONS.openSettings(); });
+  check(await p6.isHidden("#btnRate") && decodeURIComponent(await p6.getAttribute("#btnFeedback", "href")).includes("· web"), "Webfassung: kein Bewerten-Knopf, Feedback per E-Mail");
   await ctx6.close();
+  for (const [ua, name, store, play] of [
+    ["Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36", "Android-Handy", false, true],
+    ["Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36", "Computer", true, true]]) {
+    const c = await browser.newContext({ userAgent: ua, locale: "de-DE" });
+    const pg = await c.newPage();
+    await pg.goto(OPEN);
+    check(await pg.isVisible("#store") === store && await pg.isVisible("#play") === play, `Landeseite ${name}: ${[store && "App Store", play && "Google Play"].filter(Boolean).join(" und ")}`);
+    if (play) check((await pg.getAttribute("#play", "href")) === "https://play.google.com/store/apps/details?id=de.drawmory.app", `Landeseite ${name}: Play-Link stimmt`);
+    await c.close();
+  }
 
   console.log("Link-Empfang in der App (Universal Link und doppelte Zustellung)");
   await page.evaluate(() => { window.__askCalls = 0; const orig = askImport; window.askImport = (...a) => { window.__askCalls++; return orig(...a); }; });
@@ -781,6 +795,10 @@ const mockStore = platformId => `
   await p4.click('#scr-templates [data-action="back"]');
   await p4.click('[data-action="openSettings"]');
   check((await p4.textContent("#proStatus")) === "Freigeschaltet" && await p4.isHidden("#btnProRow"), "Einstellungen zeigen die Vollversion");
+  check((await p4.getAttribute("#btnRate", "href")) === "itms-apps://itunes.apple.com/app/id6827935615?action=write-review" && await p4.isVisible("#btnRate"), "iOS: Bewerten öffnet die Bewertungsseite im App Store");
+  check(!/Google|Android|Play/.test(await p4.textContent("#mdl-settings")), "iOS: Einstellungen nennen keine andere Plattform");
+  const fb4 = decodeURIComponent(await p4.getAttribute("#btnFeedback", "href"));
+  check(fb4.startsWith("mailto:smaehlmann.appdev@gmail.com?subject=Drawmory – Feedback") && fb4.includes("Drawmory " + await p4.evaluate(() => APP_VERSION) + " · ios"), "Feedback-Mail mit Betreff, Version und Plattform");
   await p4.reload();
   await p4.evaluate(() => document.dispatchEvent(new Event("deviceready")));
   check(await p4.evaluate(() => isFull()), "Freischaltung bleibt nach Neustart");
@@ -804,6 +822,12 @@ const mockStore = platformId => `
   await p5.click("#btnBuy");
   await p5.waitForTimeout(250);
   check(await p5.evaluate(() => isFull()), "Kauf unter Android schaltet frei");
+  await p5.evaluate(() => { goHome(); ACTIONS.openSettings(); });
+  check((await p5.getAttribute("#btnRate", "href")) === "market://details?id=de.drawmory.app" && await p5.isVisible("#btnRate"), "Android: Bewerten öffnet den Play Store");
+  check(!/App Store|Apple/.test(await p5.textContent("#mdl-settings")), "Android: Einstellungen nennen den App Store nicht");
+  await p5.click('#mdl-settings [data-action="lang"][data-lang="en"]');
+  check((await p5.textContent("#btnRate")) === "⭐ Rate Drawmory" && decodeURIComponent(await p5.getAttribute("#btnFeedback", "href")).includes("subject=Drawmory – feedback"), "Bewerten und Feedback auf Englisch");
+  await p5.click('#mdl-settings [data-action="lang"][data-lang="de"]');
   await ctx5.close();
 
   console.log("Android-Handy (360 dp): Wiederherstellen, Zurücktaste, Werkzeugleiste");

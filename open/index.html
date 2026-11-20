@@ -19,12 +19,12 @@
    direkt in der App – diese Seite erscheint dann gar nicht. Sie ist der
    Rückfall, wenn die App fehlt oder der Link im Browser landet.
 
-   Nach der Veröffentlichung im App Store hier die Apple-ID der App
-   eintragen (App Store Connect → App-Informationen → Apple-ID, nur
-   Ziffern). Dann erscheint der Knopf „Im App Store laden“ und Safari
-   zeigt zusätzlich das App-Banner.
+   Apple-ID der App (App Store Connect → App-Informationen → Apple-ID):
+   Knopf „Im App Store laden“ plus App-Banner in Safari. Android-Handys
+   sehen stattdessen „Bei Google Play laden“, Computer beide.
    ================================================================= */
-const APP_STORE_ID = "";
+const APP_STORE_ID = "6827935615";
+const PLAY_URL = "https://play.google.com/store/apps/details?id=de.drawmory.app";
 if (/^\d{6,12}$/.test(APP_STORE_ID)) {
   document.write('<meta name="apple-itunes-app" content="app-id=' + APP_STORE_ID + '">');
 }
@@ -86,6 +86,7 @@ footer a { color: var(--muted); }
     <div class="previews" id="previews"></div>
     <a class="btn primary" id="openApp" href="drawmory://"></a>
     <a class="btn store" id="store" hidden></a>
+    <a class="btn store" id="play" hidden></a>
     <p class="note" id="soon" hidden></p>
     <a class="small" id="web" href="../"></a>
   </div>
@@ -99,7 +100,7 @@ const TXT = {
   de: {
     one: "„{name}“ nachzeichnen", many: "{n} Vorlagen nachzeichnen",
     sub: "Diese Vorlage wurde mit Drawmory geteilt.", subMany: "Diese Vorlagen wurden mit Drawmory geteilt.",
-    open: "In Drawmory öffnen", store: "Im App Store laden",
+    open: "In Drawmory öffnen", store: "Im App Store laden", play: "Bei Google Play laden",
     soon: "Drawmory erscheint bald im App Store. Ist die App schon installiert, tippe auf „In Drawmory öffnen“.",
     web: "Ohne App im Browser ausprobieren", bad: "Dieser Link ist unvollständig. Bitte den QR-Code noch einmal scannen.",
     plain: "Drawmory", plainSub: "Anschauen. Merken. Nachzeichnen.",
@@ -108,7 +109,7 @@ const TXT = {
   en: {
     one: "Redraw “{name}”", many: "Redraw {n} templates",
     sub: "This template was shared with Drawmory.", subMany: "These templates were shared with Drawmory.",
-    open: "Open in Drawmory", store: "Get it on the App Store",
+    open: "Open in Drawmory", store: "Get it on the App Store", play: "Get it on Google Play",
     soon: "Drawmory is coming to the App Store soon. If the app is already installed, tap “Open in Drawmory”.",
     web: "Try it in the browser without the app", bad: "This link is incomplete. Please scan the QR code again.",
     plain: "Drawmory", plainSub: "Look. Remember. Redraw.",
@@ -239,11 +240,21 @@ function render() {
     $("sub").textContent = hasCode ? T("bad") : T("plainSub");
     if (hasCode) $("sub").classList.add("error");
   }
-  if (/^\d{6,12}$/.test(APP_STORE_ID)) {
+  /* Handy: nur der passende Store. Computer: beide. */
+  const ua = navigator.userAgent;
+  const android = /Android/.test(ua);
+  const apple = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (/^\d{6,12}$/.test(APP_STORE_ID) && !android) {
     $("store").hidden = false;
     $("store").textContent = T("store");
     $("store").href = "https://apps.apple.com/app/id" + APP_STORE_ID;
-  } else {
+  }
+  if (PLAY_URL && !apple) {
+    $("play").hidden = false;
+    $("play").textContent = T("play");
+    $("play").href = PLAY_URL;
+  }
+  if ($("store").hidden && $("play").hidden) {
     $("soon").hidden = false;
     $("soon").textContent = T("soon");
   }
